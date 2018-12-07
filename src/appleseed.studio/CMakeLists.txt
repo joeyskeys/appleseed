@@ -36,13 +36,22 @@
 if (NOT PYTHON_MAJOR_VERSION STREQUAL "2")
     message (FATAL_ERROR "Python 2.x needed")
 else ()
-    find_package (Boost 1.55 COMPONENTS python)
+    if (APPLE)
+        if (NOT WITH_PYTHON3_BINDINGS)
+            find_package (Boost 1.55 COMPONENTS python27)
+        else ()
+            find_package (Boost 1.55 COMPONENTS python37)
+        endif ()
+    else ()
+        find_package (Boost 1.55 COMPONENTS python)
+    endif ()
 endif ()
 
 # OpenGL.
 find_package (OpenGL REQUIRED)
 
 # Qt 4.
+set (QT_QTCORE_LIBRARY_RELEASE 0)
 find_package (Qt4 REQUIRED)
 set (QT_USE_QTOPENGL TRUE)
 include (${QT_USE_FILE})

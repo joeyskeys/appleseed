@@ -208,7 +208,6 @@ endif ()
 include_directories (SYSTEM ${Boost_INCLUDE_DIRS})
 link_directories (${Boost_LIBRARY_DIRS})
 
-
 #--------------------------------------------------------------------------------------------------
 # Find external packages.
 #--------------------------------------------------------------------------------------------------
@@ -585,15 +584,22 @@ endif ()
 
 if (WITH_PYTHON2_BINDINGS)
     set (Python_ADDITIONAL_VERSIONS 2.7)
-    find_package (PythonLibs REQUIRED)
+    #find_package (PythonLibs REQUIRED)
+    find_package(Python2 REQUIRED)
+
+    include_directories (SYSTEM ${PYTHON2_INCLUDE_DIRS})
+    link_directories (${PYTHON2_LIBRARY_DIRS})
 
     # Splitting version string into list.
-    string (REGEX MATCHALL "[0123456789]+" PYTHON_VERSION_LIST "${PYTHONLIBS_VERSION_STRING}")
+    # string (REGEX MATCHALL "[0123456789]+" PYTHON_VERSION_LIST "${PYTHONLIBS_VERSION_STRING}")
 
-    if (PYTHON_VERSION_LIST)
+    # if (PYTHON_VERSION_LIST)
+    if (PYTHON2_FOUND)
         # Accessing major and minor version numbers with the version list we got.
-        list (GET PYTHON_VERSION_LIST 0 PYTHON_MAJOR_VERSION)
-        list (GET PYTHON_VERSION_LIST 1 PYTHON_MINOR_VERSION)
+        # list (GET PYTHON_VERSION_LIST 0 PYTHON_MAJOR_VERSION)
+        # list (GET PYTHON_VERSION_LIST 1 PYTHON_MINOR_VERSION)
+        set (PYTHON_MAJOR_VERSION "2")
+        set (PYTHON_MINOR_VERSION "7")
     else ()
         # Default to latest Python 2 release if version string cannot be read.
         message (STATUS "Cannot find Python version. Using 2.7 by default")
