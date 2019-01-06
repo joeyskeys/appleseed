@@ -62,10 +62,10 @@ namespace
     //
     // Sheen BRDF.
     //
-    // References:
+    // Reference:
     //
-    //   [1] Physically-Based Shading at Disney
-    //       https://disney-animation.s3.amazonaws.com/library/s2012_pbs_disney_brdf_notes_v2.pdf
+    //   Physically-Based Shading at Disney
+    //   https://disney-animation.s3.amazonaws.com/library/s2012_pbs_disney_brdf_notes_v2.pdf
     //
 
     const char* Model = "sheen_brdf";
@@ -104,10 +104,8 @@ namespace
             if (!ScatteringMode::has_glossy(modes))
                 return;
 
-            sample.m_max_roughness = 1.0f;
-
-            // Set the scattering mode.
-            sample.m_mode = ScatteringMode::Glossy;
+            sample.set_to_scattering(ScatteringMode::Glossy, RcpTwoPi<float>());
+            sample.m_min_roughness = 1.0f;
 
             // Compute the incoming direction.
             sampling_context.split_in_place(2, 1);
@@ -125,9 +123,6 @@ namespace
             sample.m_value.m_glossy = values->m_reflectance;
             sample.m_value.m_glossy *= fh * values->m_reflectance_multiplier;
             sample.m_value.m_beauty = sample.m_value.m_glossy;
-
-            // Compute the probability density of the sampled direction.
-            sample.m_probability = RcpTwoPi<float>();
 
             sample.compute_reflected_differentials();
         }

@@ -263,6 +263,7 @@ source_group ("src\\maya" FILES
 
 set (src_appleseed_sources
      src/appleseed/as_anisotropy_vector_field.osl
+     src/appleseed/as_asc_cdl.osl
      src/appleseed/as_attributes.osl
      src/appleseed/as_blackbody.osl
      src/appleseed/as_blend_color.osl
@@ -279,6 +280,7 @@ set (src_appleseed_sources
      src/appleseed/as_glass.osl
      src/appleseed/as_globals.osl
      src/appleseed/as_id_manifold.osl
+     src/appleseed/as_invert_color.osl
      src/appleseed/as_luminance.osl
      src/appleseed/as_manifold2d.osl
      src/appleseed/as_metal.osl
@@ -312,27 +314,39 @@ source_group ("src\\appleseed" FILES
 
 
 #--------------------------------------------------------------------------------------------------
-# Prepare the sandbox.
+# Target: Prepare the sandbox.
 #--------------------------------------------------------------------------------------------------
 
-add_custom_target (SANDBOX)
+add_custom_target (
+    prepare_sandbox
+    VERBATIM
+)
 
-# Copy the OSL compiler to the sandbox.
+set_target_properties (prepare_sandbox PROPERTIES FOLDER "Contents")
+set_target_progress_message (prepare_sandbox "Preparing sandbox...")
+
+# Delete the sandbox/shaders/ directory.
+# add_custom_command (
+#     TARGET prepare_sandbox
+#     COMMAND ${CMAKE_COMMAND} -E remove_directory ${PROJECT_SOURCE_DIR}/sandbox/shaders/
+# )
+
+# Copy the OSL compiler to sandbox/bin/.
 if (USE_EXTERNAL_OSL)
     add_custom_command (
-        TARGET SANDBOX
+        TARGET prepare_sandbox
         COMMAND ${CMAKE_COMMAND} -E copy ${OSL_COMPILER} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
 else ()
     add_custom_command (
-        TARGET SANDBOX
+        TARGET prepare_sandbox
         COMMAND ${CMAKE_COMMAND} -E copy ${APPLESEED_DEPS_STAGE_DIR}/osl-release/bin/oslc${exe_ext} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
 endif ()
 
 
 #--------------------------------------------------------------------------------------------------
-# Compile shaders and deploy header files to sandbox.
+# Target: Compile shaders and deploy header files to sandbox.
 #--------------------------------------------------------------------------------------------------
 
 # Build lists of absolute paths to OSL header files, in the sources and in the sandbox.
@@ -389,6 +403,10 @@ add_custom_target (
     appleseed.shaders ALL
     DEPENDS ${abs_osl_headers_sandbox}
     SOURCES ${abs_osl_headers_sources} ${osl_sources}
+    VERBATIM
 )
 
-add_dependencies (appleseed.shaders SANDBOX)
+set_target_properties (appleseed.shaders PROPERTIES FOLDER "Contents")
+set_target_progress_message (appleseed.shaders "Compiling OSL shaders...")
+
+add_dependencies (appleseed.shaders prepare_sandbox)

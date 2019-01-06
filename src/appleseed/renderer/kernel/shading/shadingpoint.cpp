@@ -674,6 +674,8 @@ void ShadingPoint::compute_screen_space_partial_derivatives() const
 
 void ShadingPoint::compute_normals() const
 {
+    cache_source_geometry();
+
     switch (m_primitive_type)
     {
       case PrimitiveTriangle:
@@ -709,7 +711,7 @@ void ShadingPoint::compute_normals() const
 
     // Store which side of the geometric surface we hit.
     const bool back = dot(m_ray.m_dir, m_geometric_normal) > 0.0;
-    m_side = back ^ m_object_instance->flip_normals()
+    m_side = back ^ m_object_instance->must_flip_normals()
         ? ObjectInstance::BackSide
         : ObjectInstance::FrontSide;
 

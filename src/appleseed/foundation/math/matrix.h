@@ -83,7 +83,7 @@ class Matrix
     static const size_t Components = M * N;
 
     // Constructors.
-#if !defined(_MSC_VER) || _MSC_VER >= 1800
+#if APPLESEED_COMPILER_CXX_DEFAULTED_FUNCTIONS
     Matrix() = default;                                     // leave all components uninitialized
 #else
     Matrix() {}                                             // leave all components uninitialized
@@ -182,7 +182,7 @@ class Matrix<T, N, N>
     static const size_t Components = N * N;
 
     // Constructors.
-#if !defined(_MSC_VER) || _MSC_VER >= 1800
+#if APPLESEED_COMPILER_CXX_DEFAULTED_FUNCTIONS
     Matrix() = default;                                     // leave all components uninitialized
 #else
     Matrix() {}                                             // leave all components uninitialized
@@ -254,7 +254,7 @@ class Matrix<T, 3, 3>
     static const size_t Components = 3 * 3;
 
     // Constructors.
-#if !defined(_MSC_VER) || _MSC_VER >= 1800
+#if APPLESEED_COMPILER_CXX_DEFAULTED_FUNCTIONS
     Matrix() = default;                                     // leave all components uninitialized
 #else
     Matrix() {}                                             // leave all components uninitialized
@@ -379,7 +379,7 @@ class Matrix<T, 4, 4>
     static const size_t Components = 4 * 4;
 
     // Constructors.
-#if !defined(_MSC_VER) || _MSC_VER >= 1800
+#if APPLESEED_COMPILER_CXX_DEFAULTED_FUNCTIONS
     Matrix() = default;                                     // leave all components uninitialized
 #else
     Matrix() {}                                             // leave all components uninitialized
@@ -1452,8 +1452,8 @@ inline Quaternion<T> Matrix<T, 3, 3>::extract_unit_quaternion() const
 
         // Fast modulo 3.
         // See http://www.codercorner.com/Modulo3.htm.
-        const size_t j = (1 << i) & 3;
-        const size_t k = (1 << j) & 3;
+        const size_t j = (1UL << i) & 3;
+        const size_t k = (1UL << j) & 3;
 
         ValueType root =
             std::sqrt(m_comp[i*3+i] - m_comp[j*3+j] - m_comp[k*3+k] + ValueType(1.0));

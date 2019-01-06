@@ -600,6 +600,8 @@ add_executable (appleseed.studio
     ${appleseed.studio_resource_files}
 )
 
+set_target_properties (appleseed.studio PROPERTIES FOLDER "Applications")
+
 if (WIN32)
     set_target_properties (appleseed.studio PROPERTIES
         # Build a GUI application instead of a console application on Windows.
@@ -666,7 +668,13 @@ endif ()
 # Post-build commands.
 #--------------------------------------------------------------------------------------------------
 
-add_custom_target (appleseed.studio.python.copy_py_files ALL)
+add_custom_target (
+    appleseed.studio.copy_py_files ALL
+    VERBATIM
+)
+
+set_target_properties (appleseed.studio.copy_py_files PROPERTIES FOLDER "Contents")
+set_target_progress_message (appleseed.studio.copy_py_files "Copying appleseed.studio Python files...")
 
 add_copy_studio_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.studio/python/studio/__init__.py appleseed.studio)
 add_copy_studio_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.studio/python/studio/ui.py appleseed.studio)

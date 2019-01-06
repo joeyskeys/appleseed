@@ -50,6 +50,8 @@ add_executable (denoiser
     ${denoiser_sources}
 )
 
+set_target_properties (denoiser PROPERTIES FOLDER "Tools")
+
 if (USE_RPATH_ORIGIN)
     set_target_properties (denoiser PROPERTIES
         INSTALL_RPATH "\$ORIGIN/../lib"

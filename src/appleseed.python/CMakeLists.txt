@@ -136,6 +136,8 @@ add_library (appleseed.python MODULE
     ${appleseed.python_sources}
 )
 
+set_target_properties (appleseed.python PROPERTIES FOLDER "Python Bindings")
+
 set_target_properties (appleseed.python PROPERTIES
     PREFIX ""
     OUTPUT_NAME "_appleseedpython"
@@ -153,9 +155,7 @@ if (WITH_PYTHON3_BINDINGS)
         ${blender_python_sources}
     )
 
-    target_link_libraries (appleseed.python3
-        ${OPENGL_LIBRARY}
-    )
+    set_target_properties (appleseed.python3 PROPERTIES FOLDER "Python Bindings")
 
     set_target_properties (appleseed.python3 PROPERTIES
         PREFIX ""
@@ -167,6 +167,10 @@ if (WITH_PYTHON3_BINDINGS)
             SUFFIX ".pyd"
         )
     endif ()
+    
+    target_link_libraries (appleseed.python3
+        ${OPENGL_LIBRARY}
+    )
 endif ()
 
 
@@ -238,7 +242,13 @@ endif ()
 # Post-build commands.
 #--------------------------------------------------------------------------------------------------
 
-add_custom_target (appleseed.python.copy_py_files ALL)
+add_custom_target (
+    appleseed.python.copy_py_files ALL
+    VERBATIM
+)
+
+set_target_properties (appleseed.python.copy_py_files PROPERTIES FOLDER "Contents")
+set_target_progress_message (appleseed.python.copy_py_files "Copying appleseed.python Python files...")
 
 add_copy_target_to_sandbox_py_module_command (appleseed.python appleseed)
 add_copy_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.python/__init__.py appleseed)

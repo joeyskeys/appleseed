@@ -32,7 +32,7 @@
 # CMake configuration.
 #--------------------------------------------------------------------------------------------------
 
-cmake_minimum_required (VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required (VERSION 3.1 FATAL_ERROR)
 
 cmake_policy (SET CMP0008 NEW)      # libraries linked by full-path must have a valid library file name
 
@@ -47,6 +47,8 @@ endif ()
 if (POLICY CMP0043)
     cmake_policy (SET CMP0043 OLD)  # consume the content of the suffixed COMPILE_DEFINITIONS_<CONFIG>
 endif ()
+
+set_property (GLOBAL PROPERTY USE_FOLDERS ON)
 
 include (cmake/utilities.txt)
 
@@ -92,6 +94,26 @@ if (TARGET_ARCH MATCHES "i386|x86_64")
 else ()
     set (is_x86 FALSE)
 endif ()
+
+
+#--------------------------------------------------------------------------------------------------
+# Compiler features.
+#--------------------------------------------------------------------------------------------------
+
+include (WriteCompilerDetectionHeader)
+
+write_compiler_detection_header (
+  FILE ${PROJECT_SOURCE_DIR}/src/appleseed/foundation/platform/compilerfeatures.h
+  PREFIX APPLESEED
+  COMPILERS GNU Clang MSVC AppleClang
+  FEATURES
+    cxx_final
+    cxx_noexcept
+    cxx_constexpr
+    cxx_defaulted_functions
+    cxx_deleted_functions
+    cxx_generalized_initializers
+)
 
 
 #--------------------------------------------------------------------------------------------------
@@ -636,11 +658,15 @@ if (WITH_DOXYGEN)
 
     if (DOXYGEN_FOUND)
         configure_file (${PROJECT_SOURCE_DIR}/scripts/appleseed.doxyfile.in ${PROJECT_BINARY_DIR}/appleseed.doxyfile @ONLY)
+
         add_custom_target (
-            doc ${DOXYGEN_EXECUTABLE} ${PROJECT_BINARY_DIR}/appleseed.doxyfile
+            genarate_api_reference ${DOXYGEN_EXECUTABLE} ${PROJECT_BINARY_DIR}/appleseed.doxyfile
             WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
-            COMMENT "Generating API Reference with Doxygen" VERBATIM
+            VERBATIM
         )
+
+        set_target_properties (genarate_api_reference PROPERTIES FOLDER "Contents")
+        set_target_progress_message (genarate_api_reference "Generating API reference with Doxygen...")
     endif ()
 endif ()
 

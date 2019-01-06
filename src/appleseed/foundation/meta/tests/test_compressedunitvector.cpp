@@ -5,7 +5,7 @@
 //
 // This software is released under the MIT license.
 //
-// Copyright (c) 2017-2018 Francois Beaune, The appleseedhq Organization
+// Copyright (c) 2018 Esteban Tovagliari, The appleseedhq Organization
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -26,60 +26,37 @@
 // THE SOFTWARE.
 //
 
-// Interface header.
-#include "entityfactoryregistrar.h"
-
-// appleseed.renderer headers.
-#include "renderer/utility/plugin.h"
-
 // appleseed.foundation headers.
-#include "foundation/utility/searchpaths.h"
+#include "foundation/math/compressedunitvector.h"
+#include "foundation/math/vector.h"
+#include "foundation/math/rng/distribution.h"
+#include "foundation/math/rng/xoroshiro128plus.h"
+#include "foundation/math/sampling/mappings.h"
+#include "foundation/utility/iostreamop.h"
+#include "foundation/utility/test.h"
 
 // Standard headers.
-#include <vector>
+#include <cstddef>
 
-using namespace renderer;
-using namespace std;
+using namespace foundation;
 
-namespace renderer
+TEST_SUITE(Foundation_Math_CompressedUnitVector)
 {
-
-struct EntityFactoryRegistrar::Impl
-{
-    vector<Plugin*> m_plugins;
-
-    ~Impl()
+    TEST_CASE(RoundTrip)
     {
-        clear();
+        const size_t N = 2048;
+        Xoroshiro128plus rng(349, 684658);
+
+        for (size_t i = 0; i < N; ++i)
+        {
+            const Vector2f s(rand_float1(rng), rand_float1(rng));
+            const Vector3f v = sample_sphere_uniform(s);
+
+            const CompressedUnitVector compressed_v(v);
+            const Vector3f uncompressed_v(compressed_v);
+
+            const float cos_vv = dot(v, uncompressed_v);
+            EXPECT_FEQ_EPS(1.0f, cos_vv, 1.0e-6f);
+        }
     }
-
-    void clear()
-    {
-        for (Plugin* plugin : m_plugins)
-            plugin->release();
-
-        m_plugins.clear();
-    }
-};
-
-EntityFactoryRegistrar::EntityFactoryRegistrar()
-  : impl(new Impl())
-{
 }
-
-EntityFactoryRegistrar::~EntityFactoryRegistrar()
-{
-    delete impl;
-}
-
-void EntityFactoryRegistrar::unload_all_plugins()
-{
-    impl->clear();
-}
-
-void EntityFactoryRegistrar::store_plugin(Plugin* plugin)
-{
-    impl->m_plugins.push_back(plugin);
-}
-
-}   // namespace renderer

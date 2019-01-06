@@ -32,6 +32,27 @@
 # Source files.
 #--------------------------------------------------------------------------------------------------
 
+set (foundation_array_sources
+    foundation/array/algorithm.cpp
+    foundation/array/algorithm.h
+    foundation/array/applyvisitor.h
+    foundation/array/array.cpp
+    foundation/array/array.h
+    foundation/array/arrayref.h
+    foundation/array/arraytraits.h
+    foundation/array/arrayview.h
+    foundation/array/exception.cpp
+    foundation/array/exception.h
+    foundation/array/meshalgorithm.cpp
+    foundation/array/meshalgorithm.h
+)
+list (APPEND appleseed_sources
+    ${foundation_array_sources}
+)
+source_group ("foundation\\array" FILES
+    ${foundation_array_sources}
+)
+
 set (foundation_core_concepts_sources
     foundation/core/concepts/iunknown.h
     foundation/core/concepts/noncopyable.h
@@ -286,6 +307,7 @@ set (foundation_math_sources
     foundation/math/bvh.h
     foundation/math/cdf.h
     foundation/math/combination.h
+    foundation/math/compressedunitvector.h
     foundation/math/distance.h
     foundation/math/dual.h
     foundation/math/fastmath.h
@@ -410,6 +432,9 @@ source_group ("foundation\\meta\\benchmarks" FILES
 set (foundation_meta_tests_sources
     foundation/meta/tests/test_aabb.cpp
     foundation/meta/tests/test_analysis.cpp
+    foundation/meta/tests/test_array.cpp
+    foundation/meta/tests/test_arrayalgorithm.cpp
+    foundation/meta/tests/test_arrayapplyvisitor.cpp
     foundation/meta/tests/test_attributeset.cpp
     foundation/meta/tests/test_autoreleaseptr.cpp
     foundation/meta/tests/test_benchmarkaggregator.cpp
@@ -429,7 +454,9 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_color.cpp
     foundation/meta/tests/test_colorspace.cpp
     foundation/meta/tests/test_commandlineparser.cpp
+    foundation/meta/tests/test_compressedunitvector.cpp
     foundation/meta/tests/test_concepts.cpp
+    foundation/meta/tests/test_copyonwrite.cpp
     foundation/meta/tests/test_countof.cpp
     foundation/meta/tests/test_datetime.cpp
     foundation/meta/tests/test_dictionary.cpp
@@ -450,6 +477,7 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_intersection_frustumsegment.cpp
     foundation/meta/tests/test_intersection_planesegment.cpp
     foundation/meta/tests/test_intersection_rayaabb.cpp
+    foundation/meta/tests/test_intersection_raysphere.cpp
     foundation/meta/tests/test_intersection_raytriangle.cpp
     foundation/meta/tests/test_iostreamop.cpp
     foundation/meta/tests/test_job.cpp
@@ -827,6 +855,7 @@ set (foundation_utility_sources
     foundation/utility/casts.h
     foundation/utility/cc.h
     foundation/utility/commandlineparser.h
+    foundation/utility/copyonwrite.h
     foundation/utility/countof.h
     foundation/utility/filter.h
     foundation/utility/foreach.h
@@ -1631,7 +1660,6 @@ set (renderer_modeling_entity_sources
     renderer/modeling/entity/connectableentity.h
     renderer/modeling/entity/entity.cpp
     renderer/modeling/entity/entity.h
-    renderer/modeling/entity/entityfactoryregistrar.cpp
     renderer/modeling/entity/entityfactoryregistrar.h
     renderer/modeling/entity/entitymap.cpp
     renderer/modeling/entity/entitymap.h
@@ -1642,7 +1670,6 @@ set (renderer_modeling_entity_sources
     renderer/modeling/entity/onframebeginrecorder.h
     renderer/modeling/entity/onrenderbeginrecorder.cpp
     renderer/modeling/entity/onrenderbeginrecorder.h
-    renderer/modeling/entity/registerentityfactories.h
 )
 list (APPEND appleseed_sources
     ${renderer_modeling_entity_sources}
@@ -2023,6 +2050,8 @@ set (renderer_utility_sources
     renderer/utility/paramarray.h
     renderer/utility/plugin.cpp
     renderer/utility/plugin.h
+    renderer/utility/pluginstore.cpp
+    renderer/utility/pluginstore.h
     renderer/utility/projectpoints.cpp
     renderer/utility/projectpoints.h
     renderer/utility/seexpr.h
@@ -2081,6 +2110,8 @@ add_library (appleseed SHARED
     ${appleseed_sources}
 )
 
+set_target_properties (appleseed PROPERTIES FOLDER "Core")
+
 if (USE_VISIBILITY_MAP)
     set_target_properties (appleseed PROPERTIES
         LINK_FLAGS "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/appleseed/libappleseed.map"
@@ -2137,23 +2168,29 @@ target_link_libraries (appleseed
 
 # Copy OSL and OIIO tools to the sandbox.
 if (USE_EXTERNAL_OSL)
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${OSL_QUERY_INFO} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${OSL_MAKETX} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${OPENIMAGEIO_OIIOTOOL} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
 else ()
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${APPLESEED_DEPS_STAGE_DIR}/osl-release/bin/oslinfo${exe_ext} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${APPLESEED_DEPS_STAGE_DIR}/oiio-release/bin/maketx${exe_ext} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
-    add_custom_command (TARGET appleseed PRE_BUILD
+    add_custom_command (TARGET appleseed
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy ${APPLESEED_DEPS_STAGE_DIR}/oiio-release/bin/oiiotool${exe_ext} ${PROJECT_SOURCE_DIR}/sandbox/bin/
     )
 endif ()
