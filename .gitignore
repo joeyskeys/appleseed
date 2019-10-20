@@ -1,5 +1,6 @@
 .vs/
-build/
+build*/
+CMakeLists.txt.*
 sandbox/shaders/
 __pycache__
 *.pyc

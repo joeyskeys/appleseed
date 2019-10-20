@@ -30,11 +30,15 @@
 
 // appleseed.renderer headers.
 #include "renderer/global/globaltypes.h"
+#include "renderer/kernel/lighting/scatteringmode.h"
 
 // appleseed.foundation headers.
 #include "foundation/image/color.h"
 #include "foundation/math/vector.h"
 #include "foundation/platform/types.h"
+
+// OIIO headers.
+#include "OpenImageIO/ustring.h"
 
 // Standard headers.
 #include <cstddef>
@@ -96,6 +100,8 @@ class LightPathStream
 
     void end_path();
 
+    std::vector<OIIO::ustring> build_lpe_events();
+
   private:
     friend class LightPathRecorder;
 
@@ -118,6 +124,8 @@ class LightPathStream
         const ObjectInstance*       m_object_instance;          // object instance that was hit
         foundation::Vector3f        m_vertex_position;          // world space position of the hit point on the reflector
         foundation::Color3f         m_path_throughput;          // cumulative path throughput up to but excluding this vertex
+        bool                        m_crossing_interface;       // flag to indentify reflect or transmission
+        ScatteringMode::Mode        m_scattering_type;          // scattering type infomation
     };
 
     struct HitEmitterData

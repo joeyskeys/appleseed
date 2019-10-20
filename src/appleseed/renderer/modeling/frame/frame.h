@@ -94,6 +94,9 @@ class APPLESEED_DLLSYMBOL Frame
     // Construct a new Frame instance to add or modify AOVs.
     const AOVContainer& aovs() const;
 
+    // Return the LPE AOVs.
+    const AOVContainer& lpe_aovs() const;
+
     // Access the post-processing stages.
     PostProcessingStageContainer& post_processing_stages() const;
 
@@ -233,6 +236,7 @@ class APPLESEED_DLLSYMBOL Frame
         const char*                                 name,
         const ParamArray&                           params,
         const AOVContainer&                         aovs,
+        const AOVContainer&                         lpe_aovs,
         const foundation::SearchPaths&              search_paths);
 
     // Destructor.
@@ -264,13 +268,15 @@ class APPLESEED_DLLSYMBOL FrameFactory
     static foundation::auto_release_ptr<Frame> create(
         const char*                 name,
         const ParamArray&           params,
-        const AOVContainer&         aovs);
+        const AOVContainer&         aovs,
+        const AOVContainer&         lpe_aovs);
 
     // Create a new frame.
     static foundation::auto_release_ptr<Frame> create(
         const char*                     name,
         const ParamArray&               params,
         const AOVContainer&             aovs,
+        const AOVContainer&             lpe_aovs,
         const foundation::SearchPaths&  search_paths);
 };
 

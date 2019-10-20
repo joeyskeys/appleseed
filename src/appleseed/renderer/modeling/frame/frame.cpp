@@ -134,6 +134,7 @@ struct Frame::Impl
     AOVContainer                    m_aovs;
     DenoiserAOV*                    m_denoiser_aov;
     AOVContainer                    m_internal_aovs;
+    AOVContainer                    m_lpe_aovs;
     PostProcessingStageContainer    m_post_processing_stages;
 
     // Images.
@@ -149,6 +150,7 @@ struct Frame::Impl
     explicit Impl(Frame* parent)
       : m_aovs(parent)
       , m_internal_aovs(parent)
+      , m_lpe_aovs(parent)
       , m_post_processing_stages(parent)
     {
     }
@@ -158,6 +160,7 @@ Frame::Frame(
     const char*         name,
     const ParamArray&   params,
     const AOVContainer& aovs,
+    const AOVContainer& lpe_aovs,
     const SearchPaths&  search_paths)
   : Entity(g_class_uid, params)
   , impl(new Impl(this))
@@ -241,6 +244,26 @@ Frame::Frame(
         impl->m_aovs.insert(aov);
     }
 
+    // Copy and store LPE AOVs.
+    for (size_t i = 0, e = min(lpe_aovs.size(), MaxAOVCount); i < e; ++i)
+    {
+        const AOV* original_lpe_aov = lpe_aovs.get_by_index(i);
+
+        const IAOVFactory* aov_factory = aov_registrar.lookup(original_lpe_aov->get_model());
+        assert(aov_factory);
+
+        auto_release_ptr<AOV> aov = aov_factory->create(original_lpe_aov->get_parameters());
+
+        aov->create_image(
+            impl->m_frame_width,
+            impl->m_frame_height,
+            impl->m_tile_width,
+            impl->m_tile_height,
+            aov_images());
+
+        impl->m_lpe_aovs.insert(aov);
+    }
+
     // Create internal AOVs.
     if (impl->m_denoising_mode != DenoisingMode::Off)
     {
@@ -316,6 +339,11 @@ void Frame::print_settings()
 const AOVContainer& Frame::aovs() const
 {
     return impl->m_aovs;
+}
+
+const AOVContainer& Frame::lpe_aovs() const
+{
+    return impl->m_lpe_aovs;
 }
 
 PostProcessingStageContainer& Frame::post_processing_stages() const
@@ -1712,28 +1740,30 @@ auto_release_ptr<Frame> FrameFactory::create(
 {
     return
         auto_release_ptr<Frame>(
-            new Frame(name, params, AOVContainer(), SearchPaths()));
-}
-
-auto_release_ptr<Frame> FrameFactory::create(
-    const char*         name,
-    const ParamArray&   params,
-    const AOVContainer& aovs)
-{
-    return
-        auto_release_ptr<Frame>(
-            new Frame(name, params, aovs, SearchPaths()));
+            new Frame(name, params, AOVContainer(), AOVContainer(), SearchPaths()));
 }
 
 auto_release_ptr<Frame> FrameFactory::create(
     const char*         name,
     const ParamArray&   params,
     const AOVContainer& aovs,
+    const AOVContainer& lpe_aovs)
+{
+    return
+        auto_release_ptr<Frame>(
+            new Frame(name, params, aovs, lpe_aovs, SearchPaths()));
+}
+
+auto_release_ptr<Frame> FrameFactory::create(
+    const char*         name,
+    const ParamArray&   params,
+    const AOVContainer& aovs,
+    const AOVContainer& lpe_aovs,
     const SearchPaths&  search_paths)
 {
     return
         auto_release_ptr<Frame>(
-            new Frame(name, params, aovs, search_paths));
+            new Frame(name, params, aovs, lpe_aovs, search_paths));
 }
 
 }   // namespace renderer

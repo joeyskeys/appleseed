@@ -555,11 +555,7 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
         }
 
         // Build the medium list of the scattered ray.
-        const foundation::Vector3d& geometric_normal = vertex.get_geometric_normal();
-        const bool crossing_interface = vertex.m_bssrdf == nullptr &&
-            foundation::dot(vertex.m_outgoing.get_value(), geometric_normal) *
-            foundation::dot(next_ray.m_dir, geometric_normal) < 0.0;
-        if (crossing_interface)
+        if (vertex.m_crossing_interface)
         {
             // Ray goes under the surface:
             // inherit the medium list of the parent ray and add/remove the current medium.
@@ -772,6 +768,12 @@ bool PathTracer<PathVisitor, VolumeVisitor, Adjoint>::process_bounce(
         next_ray.m_ry.m_dir = next_ray.m_dir + foundation::Vector3d(sample.m_incoming.get_dy());
         next_ray.m_has_differentials = true;
     }
+
+    // Determine if it is an interface crossing.
+    const foundation::Vector3d& geometric_normal = vertex.get_geometric_normal();
+    vertex.m_crossing_interface = vertex.m_bssrdf == nullptr &&
+        foundation::dot(vertex.m_outgoing.get_value(), geometric_normal) *
+        foundation::dot(next_ray.m_dir, geometric_normal) < 0.0;
 
     return true;
 }

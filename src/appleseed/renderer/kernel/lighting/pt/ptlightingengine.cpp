@@ -192,7 +192,10 @@ namespace
             }
 
             if (m_light_path_stream)
+            {
                 m_light_path_stream->end_path();
+                aov_components.m_light_path_stream = m_light_path_stream;
+            }
         }
 
         template <typename PathVisitor, typename VolumeVisitor>
@@ -373,6 +376,11 @@ namespace
                 }
 
                 return true;
+            }
+
+            void on_path_end(const PathVertex& vertex)
+            {
+
             }
 
           protected:

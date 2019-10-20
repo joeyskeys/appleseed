@@ -372,7 +372,8 @@ namespace
             FrameFactory::create(
                 frame->get_name(),
                 params,
-                frame->aovs()));
+                frame->aovs(),
+                frame->lpe_aovs()));
 
         project.set_frame(new_frame);
 
