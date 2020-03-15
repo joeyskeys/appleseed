@@ -2799,6 +2799,10 @@ namespace
                 // Nothing to do, AOVs were directly inserted into the project.
                 break;
 
+              case ElementLPEAOVs:
+                // Nothing to do, same as AOVs
+                break;
+
               case ElementPostProcessingStages:
                 // Nothing to do, post-processing stages were directly inserted into the project.
                 break;

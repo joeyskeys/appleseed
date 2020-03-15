@@ -43,9 +43,14 @@
 #include "foundation/image/image.h"
 #include "foundation/image/tile.h"
 
+// OSL headers.
+#include "OSL/oslclosure.h"
+
 // Standard headers.
 #include <cassert>
 #include <cstring>
+
+#include <iostream>
 
 using namespace foundation;
 using namespace std;
@@ -293,7 +298,16 @@ void AOVAccumulatorContainer::write(
     }
 
     auto lpe_events = aov_components.m_light_path_stream->build_lpe_events();
-    m_accum_ptr->move(lpe_events.data());
+    for (const auto& event : lpe_events)
+    {
+        std::cout << event.c_str() << std::endl;
+        for (const auto c : event) {
+            std::cout << "moving " << c << std::endl;
+            m_accum_ptr->move(OSL::ustring(c, 1));
+        }
+        m_accum_ptr->move(OSL::Labels::STOP);
+    }
+    
     Color3f color = shading_components.m_beauty.to_rgb(g_std_lighting_conditions);
     m_accum_ptr->accum(OSL::Color3(color.r, color.g, color.b));
 }
