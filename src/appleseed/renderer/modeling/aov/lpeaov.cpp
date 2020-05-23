@@ -42,7 +42,6 @@
 #include "renderer/modeling/color/colorspace.h"
 
 // appleseed.foundation headers.
-#include "foundation/core/concepts/singleton.h"
 #include "foundation/image/color.h"
 #include "foundation/image/image.h"
 #include "foundation/image/tile.h"
@@ -72,9 +71,9 @@ namespace
     //
     struct PixelInfo
     {
-        size_t px;
-        size_t py;
-        size_t sample_count;
+        size_t      px;
+        size_t      py;
+        size_t      sample_count;
     };
 
     //
@@ -85,7 +84,7 @@ namespace
       : public OSL::Aov
     {
       public:
-        void set_image_ptr(Image *image_ptr)
+        void set_image_ptr(Image* image_ptr)
         {
             m_aov_image_ptr = image_ptr;
         }
@@ -93,8 +92,7 @@ namespace
         void write(void *flush_data, OSL::Color3 &color, float alpha, bool has_color, bool has_alpha) override
         {
             // Flush_data will point to a PixelInfo struct.
-            auto pixel_info_ptr = static_cast<PixelInfo*>(flush_data);
-
+            auto pixel_info_ptr = (PixelInfo*)(flush_data);
             m_aov_image_ptr->set_pixel(pixel_info_ptr->px, pixel_info_ptr->py, Color3f(color.x, color.y, color.z));
         }
 
@@ -102,7 +100,7 @@ namespace
         Image*                          m_aov_image_ptr;
     };
 
-    const char* LPEAOVModel = "lpe_aov";
+    const char* LPEAOVModel = "lpeaov";
 }
 
 
@@ -117,10 +115,10 @@ struct LPEAOV::Impl
 };
 
 LPEAOV::LPEAOV(const ParamArray& params)
-  : ColorAOV("oslmatte", params)
+  : UnfilteredAOV("oslmatte", params)
   , impl(new Impl())
 {
-    impl->osl_aov.set_image_ptr(m_image);
+    set_name(params.get_required<string>("name").c_str());
     impl->rule = params.get_required<string>("rule");
 }
 
@@ -147,6 +145,12 @@ OSL::Aov* LPEAOV::get_wrapped_aov() const
 auto_release_ptr<AOVAccumulator> LPEAOV::create_accumulator() const
 {
     return auto_release_ptr<AOVAccumulator>();
+}
+
+void LPEAOV::create_image(const size_t canvas_width, const size_t canvas_height, const size_t tile_width, const size_t tile_height, ImageStack &aov_images)
+{
+    UnfilteredAOV::create_image(canvas_width, canvas_height, tile_width, tile_height, aov_images);
+    impl->osl_aov.set_image_ptr(m_image);
 }
 
 

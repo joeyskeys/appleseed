@@ -59,7 +59,7 @@ namespace renderer
 //
 
 class LPEAOV
-  : public ColorAOV
+  : public UnfilteredAOV
 {
   public:
     explicit LPEAOV(const ParamArray& params);
@@ -77,6 +77,13 @@ class LPEAOV
 
   protected:
     foundation::auto_release_ptr<AOVAccumulator> create_accumulator() const override;
+
+    void create_image(
+        const size_t    canvas_width,
+        const size_t    canvas_height,
+        const size_t    tile_width,
+        const size_t    tile_height,
+        ImageStack&     aov_images) override;
 
   private:
     friend class LPEAOVFactory;

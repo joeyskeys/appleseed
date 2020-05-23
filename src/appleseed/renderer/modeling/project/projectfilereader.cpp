@@ -2553,18 +2553,23 @@ namespace
 
             m_aov.reset();
 
-            m_model = ParametrizedElementHandler::get_value(attrs, "model");
+            m_name = ParametrizedElementHandler::get_value(attrs, "name");
+            m_rule = ParametrizedElementHandler::get_value(attrs, "rule");
         }
 
-        void end_child_element(const ProjectElementID element, ElementHandlerType *handler) override
+        void end_element() override
         {
             ParametrizedElementHandler::end_element();
 
             const IAOVFactory* factory =
-                m_context.get_project().get_factory_registrar<AOV>().lookup("lpe_aov");
+                m_context.get_project().get_factory_registrar<AOV>().lookup("lpeaov");
 
             if (factory)
+            {
+                m_params.insert("name", m_name);
+                m_params.insert("rule", m_rule);
                 m_aov = factory->create(m_params);
+            }
             else
             {
                 RENDERER_LOG_ERROR(
@@ -2582,7 +2587,8 @@ namespace
       protected:
         ParseContext&               m_context;
         auto_release_ptr<LPEAOV>    m_aov;
-        string                      m_model;
+        string                      m_name;
+        string                      m_rule;
     };
 
     //

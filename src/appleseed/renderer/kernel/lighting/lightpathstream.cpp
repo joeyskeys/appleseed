@@ -109,7 +109,7 @@ void LightPathStream::hit_reflector(const PathVertex& vertex)
     data.m_vertex_position = Vector3f(vertex.get_point());
     data.m_path_throughput = vertex.m_throughput.to_rgb(g_std_lighting_conditions);
     data.m_crossing_interface = vertex.m_crossing_interface;
-    data.m_scattering_type = vertex.m_aov_mode;
+    data.m_scattering_type = vertex.m_prev_mode;
     m_hit_reflector_data.push_back(data);
 }
 
@@ -192,7 +192,39 @@ void LightPathStream::sampled_environment(
     m_sampled_env_data.push_back(data);
 }
 
-void LightPathStream::end_path()
+void LightPathStream::sampled_volume(const bool is_homogeneous)
+{
+    Event event;
+    event.m_type = EventType::SampledVolume;
+    event.m_data_index = static_cast<uint8>(m_sampled_volume_data.size());
+    m_events.push_back(event);
+
+    SampledVolumeData data;
+    data.m_is_homogeneous = is_homogeneous;
+    m_sampled_volume_data.push_back(data);
+}
+
+void LightPathStream::terminate(const TerminateType& terminate_type)
+{
+    Event event;
+    event.m_type = EventType::Terminate;
+    event.m_data_index = static_cast<uint8>(m_cut_off_data.size());
+    m_events.push_back(event);
+
+    TerminateData data;
+    data.type = terminate_type;
+    m_cut_off_data.push_back(data);
+}
+
+void LightPathStream::hit_background()
+{
+    Event event;
+    event.m_type = EventType::HitBackground;
+    m_events.push_back(event);
+}
+
+void LightPathStream::
+end_path()
 {
     // Ignore paths that fall outside of the supported range.
     if (m_pixel_coords.x >= 0 &&
@@ -217,6 +249,18 @@ void LightPathStream::end_path()
 
               case EventType::SampledEnvironment:
                 create_path_from_sampled_environment(i);
+                break;
+
+              case EventType::SampledVolume:
+                // todo: create proper path here
+                break;
+
+              case EventType::HitBackground:
+                // todo: create proper path here
+                break;
+
+              case EventType::Terminate:
+                // todo: create proper path here
                 break;
 
               assert_otherwise;
@@ -300,6 +344,24 @@ std::vector<OIIO::ustring> LightPathStream::build_lpe_events()
             break;
           }
 
+          case EventType::SampledVolume:
+          {
+            lpe_events.emplace_back("V_");
+            break;
+          }
+
+          case EventType::HitBackground:
+          {
+            lpe_events.emplace_back("B_");
+            break;
+          }
+
+          case EventType::Terminate:
+          {
+            lpe_events.emplace_back("X_");
+            break;
+          }
+
           assert_otherwise;
         }
     }
@@ -368,7 +430,11 @@ void LightPathStream::create_path_from_hit_emitter(const size_t emitter_event_in
 void LightPathStream::create_path_from_sampled_emitter(const size_t emitter_event_index)
 {
     // Find the last scattering event.
-    assert(emitter_event_index > 0);
+    //assert(emitter_event_index > 0);
+
+    if (emitter_event_index == 0)
+        return;
+
     size_t last_scattering_event_index = emitter_event_index - 1;
     while (m_events[last_scattering_event_index].m_type != EventType::HitReflector &&
            m_events[last_scattering_event_index].m_type != EventType::HitEmitter)

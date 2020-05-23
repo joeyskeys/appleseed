@@ -221,6 +221,15 @@
                     1.000000
                 </alpha>
             </color>
+            <color name="pure_white">
+                <parameter name="color_space" value="linear_rgb" />
+                <values>
+                    1.000000 1.000000 1.000000
+                </values>
+                <alpha>
+                    1.000000
+                </alpha>
+            </color>
             <bsdf name="green_material_brdf" model="lambertian_brdf">
                 <parameter name="reflectance" value="green" />
             </bsdf>
@@ -238,6 +247,13 @@
                 <parameter name="glossy_reflectance_multiplier" value="1.0" />
                 <parameter name="shininess_u" value="100.0" />
                 <parameter name="shininess_v" value="100.0" />
+            </bsdf>
+            <bsdf name="glass_exterior_btdf" model="specular_btdf">
+                <parameter name="ior" value="1.5" />
+                <parameter name="reflectance" value="pure_white" />
+                <parameter name="reflectance_multiplier" value="1.0" />
+                <parameter name="transmittance" value="pure_white" />
+                <parameter name="transmittance_multiplier" value="1.0" />
             </bsdf>
             <edf name="light_material_edf" model="diffuse_edf">
                 <parameter name="radiance" value="light_radiance" />
@@ -258,6 +274,10 @@
             </material>
             <material name="white_material" model="generic_material">
                 <parameter name="bsdf" value="white_material_brdf" />
+                <parameter name="surface_shader" value="physical_shader" />
+            </material>
+            <material name="glass_exterior_material" model="generic_material">
+                <parameter name="bsdf" value="glass_exterior_btdf" />
                 <parameter name="surface_shader" value="physical_shader" />
             </material>
             <object name="back_wall" model="mesh_object">
@@ -283,6 +303,9 @@
             </object>
             <object name="tall_block" model="mesh_object">
                 <parameter name="filename" value="tall_block.binarymesh" />
+            </object>
+            <object name="glass_sphere" model="mesh_object">
+                <parameter name="filename" value="glass_sphere.obj" />
             </object>
             <object_instance name="back_wall_inst" object="back_wall.back_wall">
                 <transform>
@@ -350,7 +373,7 @@
                 </transform>
                 <assign_material slot="green_material" side="front" material="green_material" />
             </object_instance>
-            <object_instance name="short_block_inst" object="short_block.short_block">
+            <object_instance name="glass_sphere_inst" object="glass_sphere.glass_sphere">
                 <transform>
                     <matrix>
                         0.001000000047497 0.000000000000000 0.000000000000000 0.000000000000000
@@ -359,7 +382,8 @@
                         0.000000000000000 0.000000000000000 0.000000000000000 1.000000000000000
                     </matrix>
                 </transform>
-                <assign_material slot="white_material" side="front" material="white_material" />
+                <assign_material slot="Default" side="front" material="glass_exterior_material" />
+                <assign_material slot="Default" side="back" material="glass_exterior_material" />
             </object_instance>
             <object_instance name="tall_block_inst" object="tall_block.tall_block">
                 <transform>
@@ -379,11 +403,15 @@
     <output>
         <frame name="beauty">
             <parameter name="camera" value="camera" />
-            <parameter name="crop_window" value="116 126 218 320" />
             <parameter name="resolution" value="512 512" />
             <parameter name="reference_image" value="ref/01 - all aovs with crop window.exr" />
             <lpeaovs>
-                <lpeaov rule=""/>
+                <lpeaov name="direct_diffuse" rule="C[DO]{2}[XB]" />
+                <lpeaov name="indirect_diffuse" rule="C[^D]D*[XB]" />
+                <lpeaov name="greenwallonsphere" rule="CTRT.*[XB]" />
+                <lpeaov name="specular" rule="C[GO]*[XB]" />
+                <lpeaov name="transparent" rule="CT[RTVOB]*[XB]" />
+                <lpeaov name="terminate" rule="C[RTOB]*[XB]" />
             </lpeaovs>
         </frame>
     </output>

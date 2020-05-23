@@ -295,7 +295,7 @@ namespace
             const Vector3f& shading_normal = shading_basis.get_normal();
             const float cos_in = abs(dot(incoming, shading_normal));
             const float cos_on = abs(dot(outgoing, shading_normal));
-            const float cos_oh = abs(dot(outgoing, h));
+            const float cos_oh = clamp(abs(dot(outgoing, h)), 0.f, 1.f);
             const float cos_hn = abs(dot(h, shading_normal));
             const float cos_hu = abs(dot(h, shading_basis.get_tangent_u()));
             const float cos_hv = abs(dot(h, shading_basis.get_tangent_v()));

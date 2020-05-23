@@ -317,7 +317,11 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
 
         // Terminate the path if the surface has no material.
         if (material == nullptr)
+        {
+            //m_path_visitor.on_miss(vertex);
+            m_path_visitor.on_terminate(TerminateType::NoMaterialTerminate);
             break;
+        }
 
         // Retrieve the material's render data.
         const Material::RenderData& material_data = material->get_render_data();
@@ -476,16 +480,22 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
         // the incoming vertex if we need to change the probability of reaching this vertex by BSDF
         // sampling from projected solid angle measure to area measure.
         vertex.m_cos_on = foundation::dot(vertex.m_outgoing.get_value(), vertex.get_shading_normal());
-        m_path_visitor.on_hit(vertex);
+        //m_path_visitor.on_hit(vertex);
 
         // Use Russian Roulette to cut the path without introducing bias.
         if (!continue_path_rr(sampling_context, vertex))
+        {
+            m_path_visitor.on_terminate(TerminateType::RussianRouletteTerminate);
             break;
+        }
 
         // Honor the global bounce limit.
         const size_t bounces = vertex.m_path_length - 1;
         if (bounces == m_max_bounces)
+        {
+            m_path_visitor.on_terminate(TerminateType::BounceLimitTerminate);
             break;
+        }
 
         // Determine which scattering modes are still enabled.
         if (m_diffuse_bounces >= m_max_diffuse_bounces)
@@ -499,7 +509,10 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
 
         // Terminate path if no scattering event is possible.
         if (vertex.m_scattering_modes == ScatteringMode::None)
+        {
+            m_path_visitor.on_terminate(TerminateType::NoScatteringPossibleTerminate);
             break;
+        }
 
         BSDFSample bsdf_sample(
             vertex.m_shading_point,
@@ -519,7 +532,10 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
                     foundation::Vector3f(vertex.m_outgoing.get_value()),
                     bssrdf_sample,
                     bsdf_sample))
+            {
+                m_path_visitor.on_terminate(TerminateType::NoIncomingPointTerminate);
                 break;
+            }
 
             // Update the path throughput.
             vertex.m_throughput *= bssrdf_sample.m_value;
@@ -529,11 +545,17 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
             vertex.m_shading_point = &bssrdf_sample.m_incoming_point;
             vertex.m_bsdf = bssrdf_sample.m_brdf;
             vertex.m_bsdf_data = bssrdf_sample.m_brdf_data;
+
+            // Record scattering mode for bssrdf sample.
+            vertex.m_prev_mode = bsdf_sample.get_mode();
         }
 
         // Terminate the path if no above-surface scattering possible.
         if (vertex.m_bsdf == nullptr && material->get_render_data().m_volume == nullptr)
+        {
+            m_path_visitor.on_terminate(TerminateType::NoAboveSurfaceTerminate);
             break;
+        }
 
         // In case there is no BSDF, the current ray will be continued without increasing its depth.
         ShadingRay next_ray(
@@ -551,8 +573,13 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
 
             // Terminate the path if this scattering event is not accepted.
             if (!continue_path)
+            {
+                m_path_visitor.on_terminate(TerminateType::ScatteringNotAcceptedTerminate);
                 break;
+            }
         }
+
+        m_path_visitor.on_hit(vertex);
 
         // Build the medium list of the scattered ray.
         if (vertex.m_crossing_interface)
@@ -614,7 +641,10 @@ size_t PathTracer<PathVisitor, VolumeVisitor, Adjoint>::trace(
                     next_ray,
                     vertex,
                     *next_shading_point))
+            {
+                m_path_visitor.on_terminate(TerminateType::MediaMarchErrorTerminate);
                 break;
+            }
         }
         else
         {

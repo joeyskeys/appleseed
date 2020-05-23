@@ -198,19 +198,25 @@ AOVAccumulatorContainer::AOVAccumulatorContainer(const Frame& frame)
         insert(aov->create_accumulator());
     }
 
-    // Create accumulators for LPE AOVs.
-    for (size_t i = 0, e = frame.lpe_aovs().size(); i < e; ++i)
-    {
-        const LPEAOV* aov = static_cast<LPEAOV*>(frame.lpe_aovs().get_by_index(i));
-        m_automata.addRule(aov->get_rule_string(), i);
-    }
-    m_automata.compile();
+    // Add custom LPE events and scattering types.
+    m_automata.addEventType(OSL::ustring("X"));
 
-    m_accum_ptr = unique_ptr<OSL::Accumulator>(new OSL::Accumulator(&m_automata));
-    for (size_t i = 0, e = frame.lpe_aovs().size(); i < e; ++i)
+    // Create accumulators for LPE AOVs if there is any.
+    if (frame.lpe_aovs().size() > 0)
     {
-        const LPEAOV* aov = static_cast<LPEAOV*>(frame.lpe_aovs().get_by_index(i));
-        m_accum_ptr->setAov(i, aov->get_wrapped_aov(), false, false);
+        for (size_t i = 0, e = frame.lpe_aovs().size(); i < e; ++i)
+        {
+            const LPEAOV* aov = static_cast<LPEAOV*>(frame.lpe_aovs().get_by_index(i));
+            m_automata.addRule(aov->get_rule_string(), i);
+        }
+        m_automata.compile();
+
+        m_accum_ptr = unique_ptr<OSL::Accumulator>(new OSL::Accumulator(&m_automata));
+        for (size_t i = 0, e = frame.lpe_aovs().size(); i < e; ++i)
+        {
+            const LPEAOV* aov = static_cast<LPEAOV*>(frame.lpe_aovs().get_by_index(i));
+            m_accum_ptr->setAov(i, aov->get_wrapped_aov(), false, false);
+        }
     }
 }
 
@@ -250,9 +256,6 @@ void AOVAccumulatorContainer::on_pixel_begin(
 {
     for (size_t i = 0, e = m_size; i < e; ++i)
         m_accumulators[i]->on_pixel_begin(pi);
-
-    m_accum_ptr->begin();
-    m_accum_ptr->pushState();
 }
 
 void AOVAccumulatorContainer::on_pixel_end(
@@ -261,9 +264,11 @@ void AOVAccumulatorContainer::on_pixel_end(
     for (size_t i = 0, e = m_size; i < e; ++i)
         m_accumulators[i]->on_pixel_end(pi);
 
-    m_accum_ptr->popState();
-    PixelInfo pixel_info{static_cast<size_t>(pi.x), static_cast<size_t>(pi.y), 0};
-    m_accum_ptr->end(&pixel_info);
+    if (m_accum_ptr)
+    {
+        PixelInfo pixel_info{static_cast<size_t>(pi.x), static_cast<size_t>(pi.y), 0};
+        m_accum_ptr->end(&pixel_info);
+    }
 }
 
 void AOVAccumulatorContainer::on_sample_begin(
@@ -271,6 +276,12 @@ void AOVAccumulatorContainer::on_sample_begin(
 {
     for (size_t i = 0, e = m_size; i < e; ++i)
         m_accumulators[i]->on_sample_begin(pixel_context);
+
+    if (m_accum_ptr)
+    {
+        m_accum_ptr->begin();
+        m_accum_ptr->pushState();
+    }
 }
 
 void AOVAccumulatorContainer::on_sample_end(
@@ -278,6 +289,11 @@ void AOVAccumulatorContainer::on_sample_end(
 {
     for (size_t i = 0, e = m_size; i < e; ++i)
         m_accumulators[i]->on_sample_end(pixel_context);
+
+    if (m_accum_ptr)
+    {
+        m_accum_ptr->popState();
+    }
 }
 
 void AOVAccumulatorContainer::write(
@@ -297,19 +313,20 @@ void AOVAccumulatorContainer::write(
             shading_result);
     }
 
-    auto lpe_events = aov_components.m_light_path_stream->build_lpe_events();
-    for (const auto& event : lpe_events)
+    if (m_accum_ptr)
     {
-        std::cout << event.c_str() << std::endl;
-        for (const auto c : event) {
-            std::cout << "moving " << c << std::endl;
-            m_accum_ptr->move(OSL::ustring(c, 1));
+        //auto lpe_events = aov_components.m_light_path_stream->build_lpe_events();
+        for (const auto& event : aov_components.m_lpe_events)
+        {
+            for (const auto c : event) {
+                m_accum_ptr->move(OSL::ustring(&c, 1));
+            }
+            m_accum_ptr->move(OSL::Labels::STOP);
         }
-        m_accum_ptr->move(OSL::Labels::STOP);
+
+        Color3f color = shading_components.m_beauty.to_rgb(g_std_lighting_conditions);
+        m_accum_ptr->accum(OSL::Color3(color.r, color.g, color.b));
     }
-    
-    Color3f color = shading_components.m_beauty.to_rgb(g_std_lighting_conditions);
-    m_accum_ptr->accum(OSL::Color3(color.r, color.g, color.b));
 }
 
 bool AOVAccumulatorContainer::insert(auto_release_ptr<AOVAccumulator> aov_accum)

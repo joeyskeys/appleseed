@@ -60,6 +60,22 @@ namespace renderer
 {
 
 //
+// Cut off event enum for path termination in path tracer.
+//
+
+enum class TerminateType :foundation::uint8
+{
+    NoMaterialTerminate,
+    RussianRouletteTerminate,
+    BounceLimitTerminate,
+    NoScatteringPossibleTerminate,
+    NoIncomingPointTerminate,
+    NoAboveSurfaceTerminate,
+    ScatteringNotAcceptedTerminate,
+    MediaMarchErrorTerminate
+};
+
+//
 // This class allows a single thread to collect light paths in memory.
 //
 
@@ -98,6 +114,14 @@ class LightPathStream
         const Spectrum&                 material_value,
         const Spectrum&                 emitted_radiance);
 
+    void sampled_volume(
+        const bool                      is_homogeneous);
+
+    void terminate(
+        const TerminateType&            terminate_type);
+
+    void hit_background();
+
     void end_path();
 
     std::vector<OIIO::ustring> build_lpe_events();
@@ -110,7 +134,10 @@ class LightPathStream
         HitReflector,
         HitEmitter,
         SampledEmitter,
-        SampledEnvironment
+        SampledEnvironment,
+        SampledVolume,
+        HitBackground,
+        Terminate
     };
 
     struct Event
@@ -150,6 +177,16 @@ class LightPathStream
         foundation::Color3f         m_emitted_radiance;         // emitted radiance in W.sr^-1.m^-2
     };
 
+    struct SampledVolumeData
+    {
+        bool                        m_is_homogeneous;
+    };
+
+    struct TerminateData
+    {
+        TerminateType type;
+    };
+
     typedef foundation::Vector<foundation::uint16, 2> Vector2u16;
 
     struct StoredPath
@@ -183,6 +220,8 @@ class LightPathStream
     std::vector<HitEmitterData>     m_hit_emitter_data;
     std::vector<SampledEmitterData> m_sampled_emitter_data;
     std::vector<SampledEnvData>     m_sampled_env_data;
+    std::vector<SampledVolumeData>  m_sampled_volume_data;
+    std::vector<TerminateData>      m_cut_off_data;
 
     // Final representation as paths and path vertices (persistent).
     std::vector<StoredPath>         m_paths;

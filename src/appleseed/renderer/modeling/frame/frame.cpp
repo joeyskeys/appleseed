@@ -245,7 +245,7 @@ Frame::Frame(
     }
 
     // Copy and store LPE AOVs.
-    for (size_t i = 0, e = min(lpe_aovs.size(), MaxAOVCount); i < e; ++i)
+    for (size_t i = 0, e = lpe_aovs.size(); i < e; ++i)
     {
         const AOV* original_lpe_aov = lpe_aovs.get_by_index(i);
 
@@ -1176,7 +1176,7 @@ bool Frame::write_aov_images(const char* file_path) const
 {
     assert(file_path);
 
-    if (impl->m_aovs.empty())
+    if (impl->m_aovs.empty() && impl->m_lpe_aovs.empty())
         return true;
 
     bf::path bf_file_path(file_path);
@@ -1210,6 +1210,21 @@ bool Frame::write_aov_images(const char* file_path) const
         // Write AOV image.
         ImageAttributes image_attributes = ImageAttributes::create_default_attributes();
         if (!aov.write_images(aov_file_path.c_str(), image_attributes))
+            success = false;
+    }
+
+    // Write LPE AOV images here
+    for (const AOV& lpe_aov : impl->m_lpe_aovs)
+    {
+        // Compute AOV image file path.
+        const string aov_name = lpe_aov.get_name();
+        const string safe_aov_name = make_safe_filename(aov_name);
+        const string aov_file_name = base_file_name + "." + safe_aov_name + ".exr";
+        const string aov_file_path = (directory / aov_file_name).string();
+
+        // Write AOV image
+        ImageAttributes image_attributes = ImageAttributes::create_default_attributes();
+        if (!lpe_aov.write_images(aov_file_path.c_str(), image_attributes))
             success = false;
     }
 
@@ -1252,6 +1267,32 @@ bool Frame::write_main_and_aov_images() const
 
             ImageAttributes image_attributes = ImageAttributes::create_default_attributes();
             if (!aov.write_images(bf_file_path.string().c_str(), image_attributes))
+                success = false;
+        }
+    }
+
+    // Write LPE AOV images.
+    for (const AOV& lpe_aov : impl->m_lpe_aovs)
+    {
+        bf::path bf_file_path = lpe_aov.get_parameters().get_optional<string>("output_filename");
+        if (!bf_file_path.empty())
+        {
+            const string extension = lower_case(bf_file_path.extension().string());
+            if (extension != ".exr")
+            {
+                if (has_extension(bf_file_path))
+                {
+                    RENDERER_LOG_WARNING(
+                        "aov \"%s\" cannot be saved to %s file; saving it to exr file instead.",
+                        lpe_aov.get_path().c_str(),
+                        extension.substr(1).c_str());
+                }
+
+                bf_file_path.replace_extension(".exr");
+            }
+
+            ImageAttributes image_attributes = ImageAttributes::create_default_attributes();
+            if (!lpe_aov.write_images(bf_file_path.string().c_str(), image_attributes))
                 success = false;
         }
     }
@@ -1303,6 +1344,26 @@ void Frame::write_main_and_aov_images_to_multipart_exr(const char* file_path) co
         image_attributes.insert("image_name", aov_name.c_str());
 
         writer.set_image_channels(aov.get_channel_count(), aov.get_channel_names());
+        writer.set_image_attributes(image_attributes);
+    }
+
+    // Add LPE AOV images
+    for (const AOV& lpe_aov : impl->m_aovs)
+    {
+        const string aov_name = lpe_aov.get_name();
+        const Image& image = lpe_aov.get_image();
+
+        if (lpe_aov.has_color_data())
+        {
+            const CanvasProperties& props = image.properties();
+            images.emplace_back(image, props.m_tile_width, props.m_tile_height, PixelFormatHalf);
+            writer.append_image(&(images.back()));
+        }
+        else writer.append_image(&image);
+
+        image_attributes.insert("image_name", aov_name.c_str());
+
+        writer.set_image_channels(lpe_aov.get_channel_count(), lpe_aov.get_channel_names());
         writer.set_image_attributes(image_attributes);
     }
 
