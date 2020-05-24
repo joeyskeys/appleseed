@@ -30,7 +30,6 @@
 
 // appleseed.renderer headers.
 #include "renderer/global/globaltypes.h"
-#include "renderer/kernel/lighting/lightpathstream.h"
 
 // appleseed.foundation headers.
 #include "foundation/image/color.h"
@@ -44,7 +43,6 @@ class AOVComponents
     Spectrum                    m_albedo;
     foundation::Color3f         m_npr_shading;
     foundation::Color4f         m_npr_contour;
-    //LightPathStream*            m_light_path_stream;
     std::vector<OIIO::ustring>  m_lpe_events;
 
     // Constructor. Clears all components to 0.

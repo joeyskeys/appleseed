@@ -30,7 +30,6 @@
 
 // appleseed.renderer headers.
 #include "renderer/modeling/aov/aov.h"
-#include "renderer/modeling/aov/lpeaov.h"
 #include "renderer/modeling/aov/aovcontainer.h"
 #include "renderer/modeling/entity/entitytraits.h"
 
