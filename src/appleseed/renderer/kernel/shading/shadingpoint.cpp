@@ -32,12 +32,14 @@
 
 // appleseed.renderer headers.
 #include "renderer/kernel/intersection/intersector.h"
+#include "renderer/kernel/intersection/refining.h"
 #include "renderer/modeling/camera/camera.h"
 #include "renderer/modeling/input/source.h"
 #include "renderer/modeling/input/sourceinputs.h"
 #include "renderer/modeling/material/ibasismodifier.h"
 #include "renderer/modeling/object/meshobject.h"
 #include "renderer/modeling/object/object.h"
+#include "renderer/modeling/object/proceduralobject.h"
 #include "renderer/modeling/scene/scene.h"
 #include "renderer/modeling/shadergroup/shadergroup.h"
 #include "renderer/utility/triangle.h"
@@ -53,7 +55,6 @@
 #include <utility>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -86,12 +87,12 @@ void ShadingPoint::flip_side()
     const double t = 2.0 * m_ray.m_tmax;
 
     m_ray.m_org = m_ray.point_at(t);
-    m_ray.m_rx.m_org = m_ray.m_rx.point_at(t);
-    m_ray.m_ry.m_org = m_ray.m_ry.point_at(t);
+    m_ray.m_rx_org = m_ray.m_rx_org + t * m_ray.m_rx_dir;
+    m_ray.m_ry_org = m_ray.m_ry_org + t * m_ray.m_ry_dir;
 
     m_ray.m_dir = -m_ray.m_dir;
-    m_ray.m_rx.m_dir = -m_ray.m_rx.m_dir;
-    m_ray.m_ry.m_dir = -m_ray.m_ry.m_dir;
+    m_ray.m_rx_dir = -m_ray.m_rx_dir;
+    m_ray.m_ry_dir = -m_ray.m_ry_dir;
 
     m_members = 0;
 
@@ -113,11 +114,6 @@ void ShadingPoint::flip_side()
     if (m_side == ObjectInstance::FrontSide)
         m_side = ObjectInstance::BackSide;
     else m_side = ObjectInstance::FrontSide;
-
-    // Clear the biased point if it depends on a normal vector.
-    if ((m_members & HasBiasedPoint) &&
-        m_object_instance->get_ray_bias_method() == ObjectInstance::RayBiasMethodNormal)
-        m_members &= ~HasBiasedPoint;
 
     // Flip the geometric normal.
     assert(m_members & HasGeometricNormal);
@@ -371,116 +367,102 @@ void ShadingPoint::refine_and_offset() const
     cache_source_geometry();
 
     // Compute the location of the intersection point in assembly instance space.
-    ShadingRay::RayType local_ray = m_assembly_instance_transform.to_local(m_ray);
-    local_ray.m_org += local_ray.m_tmax * local_ray.m_dir;
+    ShadingRay::RayType refine_space_ray = m_assembly_instance_transform.to_local(m_ray);
 
     switch (m_primitive_type)
     {
       case PrimitiveTriangle:
         {
-            // Refine the location of the intersection point.
-            local_ray.m_org =
-                Intersector::refine(
-                    m_triangle_support_plane,
-                    local_ray.m_org,
-                    local_ray.m_dir);
+            // Offset the ray origin to the hit point.
+            refine_space_ray.m_org += refine_space_ray.m_tmax * refine_space_ray.m_dir;
 
-            // Compute the geometric normal to the hit triangle in assembly instance space.
-            // Note that it doesn't need to be normalized at this point.
-            m_asm_geo_normal = Vector3d(compute_triangle_normal(m_v0, m_v1, m_v2));
-            m_asm_geo_normal = m_object_instance->get_transform().normal_to_parent(m_asm_geo_normal);
-            m_asm_geo_normal = faceforward(m_asm_geo_normal, local_ray.m_dir);
+            const auto intersection_handling = [this](const Vector3d& p, const Vector3d& n)
+            {
+                return m_triangle_support_plane.intersect(p, n);
+            };
+
+            // Refine the location of the intersection point.
+            refine_space_ray.m_org =
+                refine(
+                    refine_space_ray.m_org,
+                    refine_space_ray.m_dir,
+                    intersection_handling);
+
+            // Compute the geometric normal to the hit triangle in assembly instance space (non unit-length).
+            m_refine_space_geo_normal = Vector3d(compute_triangle_normal(m_v0, m_v1, m_v2));
+            m_refine_space_geo_normal = m_object_instance->get_transform().normal_to_parent(m_refine_space_geo_normal);
+            m_refine_space_geo_normal = faceforward(m_refine_space_geo_normal, refine_space_ray.m_dir);
 
             // Compute the offset points in assembly instance space.
 #ifdef RENDERER_ADAPTIVE_OFFSET
-            Intersector::adaptive_offset(
-                m_triangle_support_plane,
-                local_ray.m_org,
-                m_asm_geo_normal,
-                m_front_point,
-                m_back_point);
+            adaptive_offset(
+                refine_space_ray.m_org,
+                m_refine_space_geo_normal,
+                m_refine_space_front_point,
+                m_refine_space_back_point,
+                intersection_handling);
 #else
-            Intersector::fixed_offset(
+            fixed_offset(
                 local_ray.m_org,
-                m_asm_geo_normal,
-                m_front_point,
-                m_back_point);
+                m_refine_space_geo_normal,
+                m_refine_space_front_point,
+                m_refine_space_back_point);
 #endif
         }
         break;
 
       case PrimitiveProceduralSurface:
-        // TODO: do we need to refine & offset here as well?
-        m_front_point = m_back_point = local_ray.m_org;
+          {
+#ifdef RENDERER_ADAPTIVE_OFFSET
+              // Compute the location of the intersection point in object space.
+              refine_space_ray = m_object_instance->get_transform().to_local(refine_space_ray);
+
+              // Offset the ray origin to the hit point.
+              refine_space_ray.m_org += refine_space_ray.m_tmax * refine_space_ray.m_dir;
+
+              // Compute the offset points and geometric normal in object space.
+              const ProceduralObject& object = static_cast<const ProceduralObject&>(get_object());
+              object.refine_and_offset(
+                  refine_space_ray,
+                  m_refine_space_front_point,
+                  m_refine_space_back_point,
+                  m_refine_space_geo_normal);
+#else
+              assert(false);
+#endif
+          }
         break;
 
       case PrimitiveCurve1:
       case PrimitiveCurve3:
         {
+            // Offset the ray origin to the hit point.
+            refine_space_ray.m_org += refine_space_ray.m_tmax * refine_space_ray.m_dir;
+
             assert(is_curve_primitive());
 
-            m_asm_geo_normal = normalize(-local_ray.m_dir);
+            const Vector3d x = get_dpdu(0);
+            const Vector3d& sn_curve = -refine_space_ray.m_dir;
+            const Vector3d z = cross(sn_curve, x);
+            m_refine_space_geo_normal = cross(z, x);
 
             // todo: this does not look correct, considering the flat ribbon nature of curves.
             const double Eps = 1.0e-6;
-            m_front_point = local_ray.m_org + Eps * m_asm_geo_normal;
-            m_back_point = local_ray.m_org - Eps * m_asm_geo_normal;
+            m_refine_space_front_point = refine_space_ray.m_org + Eps * m_refine_space_geo_normal;
+            m_refine_space_back_point = refine_space_ray.m_org - Eps * m_refine_space_geo_normal;
         }
         break;
 
       assert_otherwise;
     }
 
+    // Check that refined values are not NaN.
+    assert(m_refine_space_back_point == m_refine_space_back_point);
+    assert(m_refine_space_front_point == m_refine_space_front_point);
+    assert(m_refine_space_geo_normal == m_refine_space_geo_normal);
+
     // The refined intersection points are now available.
     m_members |= ShadingPoint::HasRefinedPoints;
-}
-
-Vector3d ShadingPoint::get_biased_point(const Vector3d& direction) const
-{
-    assert(hit_surface());
-
-    if (!(m_members & HasBiasedPoint))
-    {
-        cache_source_geometry();
-
-        switch (m_object_instance->get_ray_bias_method())
-        {
-          case ObjectInstance::RayBiasMethodNone:
-            {
-                m_biased_point = get_point();
-                m_members |= HasBiasedPoint;
-                return m_biased_point;
-            }
-
-          case ObjectInstance::RayBiasMethodNormal:
-            {
-                const Vector3d& p = get_point();
-                const Vector3d& n = get_geometric_normal();
-                const double bias = m_object_instance->get_ray_bias_distance();
-                return dot(direction, n) > 0.0 ? p + bias * n : p - bias * n;
-            }
-
-          case ObjectInstance::RayBiasMethodIncomingDirection:
-            {
-                const Vector3d& p = get_point();
-                const double bias = m_object_instance->get_ray_bias_distance();
-                m_biased_point = p + bias * m_ray.m_dir;
-                m_members |= HasBiasedPoint;
-                return m_biased_point;
-            }
-
-          case ObjectInstance::RayBiasMethodOutgoingDirection:
-            {
-                const Vector3d& p = get_point();
-                const double bias = m_object_instance->get_ray_bias_distance();
-                return p + bias * normalize(direction);
-            }
-
-          assert_otherwise;
-        }
-    }
-
-    return m_biased_point;
 }
 
 void ShadingPoint::compute_world_space_partial_derivatives() const
@@ -503,21 +485,21 @@ void ShadingPoint::compute_world_space_partial_derivatives() const
             const double dv0 = static_cast<double>(m_v0_uv[1] - m_v2_uv[1]);
             const double du1 = static_cast<double>(m_v1_uv[0] - m_v2_uv[0]);
             const double dv1 = static_cast<double>(m_v1_uv[1] - m_v2_uv[1]);
-            const double det = du0 * dv1 - dv0 * du1;
+            const double det = dv1 * du0 - dv0 * du1;
 
             if (det != 0.0)
             {
+                const double rcp_det = 1.0 / det;
+
                 const Vector3d& v2 = get_vertex(2);
                 const Vector3d dp0 = get_vertex(0) - v2;
                 const Vector3d dp1 = get_vertex(1) - v2;
-
-                const double rcp_det = 1.0 / det;
 
                 m_dpdu = (dv1 * dp0 - dv0 * dp1) * rcp_det;
                 m_dpdv = (du0 * dp1 - du1 * dp0) * rcp_det;
 
                 //
-                // Substract the component of dPdu (resp. dPdv) that is not orthogonal to the shading normal.
+                // Subtract the component of dPdu (resp. dPdv) that is not orthogonal to the shading normal.
                 // Assuming that the geometric and shading normals don't differ excessively, this leads to a
                 // very negligible shortening of dPdu (resp. dPdv).
                 //
@@ -605,9 +587,7 @@ void ShadingPoint::compute_screen_space_partial_derivatives() const
     //   Physically Based Rendering, second edition, pp. 506-509
     //
 
-    const ShadingRay& ray = get_ray();
-
-    if (!ray.m_has_differentials)
+    if (!m_ray.m_has_differentials)
     {
         m_dpdx = Vector3d(0.0);
         m_dpdy = Vector3d(0.0);
@@ -620,8 +600,8 @@ void ShadingPoint::compute_screen_space_partial_derivatives() const
     const Vector3d& n = get_original_shading_normal();
 
     double tx, ty;
-    if (!intersect(ray.m_rx, p, n, tx) ||
-        !intersect(ray.m_ry, p, n, ty))
+    if (!intersect_ray_plane(m_ray.m_rx_org, m_ray.m_rx_dir, p, n, tx) ||
+        !intersect_ray_plane(m_ray.m_ry_org, m_ray.m_ry_dir, p, n, ty))
     {
         m_dpdx = Vector3d(0.0);
         m_dpdy = Vector3d(0.0);
@@ -630,8 +610,8 @@ void ShadingPoint::compute_screen_space_partial_derivatives() const
         return;
     }
 
-    m_dpdx = ray.m_rx.point_at(tx) - p;
-    m_dpdy = ray.m_ry.point_at(ty) - p;
+    m_dpdx = m_ray.m_rx_org + tx * m_ray.m_rx_dir - p;
+    m_dpdy = m_ray.m_ry_org + ty * m_ray.m_ry_dir - p;
 
     // Select the two axes along which the normal has the smallest components.
     static const size_t Axes[3][2] = { {1, 2}, {0, 2}, {0, 1} };
@@ -784,46 +764,98 @@ void ShadingPoint::compute_triangle_normals() const
 void ShadingPoint::compute_curve_normals() const
 {
     // We assume flat ribbons facing incoming rays.
-
-    m_geometric_normal = m_original_shading_normal = -m_ray.m_dir;
+    m_geometric_normal = m_original_shading_normal = normalize(-m_ray.m_dir);
 }
 
 void ShadingPoint::compute_shading_basis() const
 {
-    // Compute the unperturbed shading normal.
-    const Vector3d sn = get_original_shading_normal();
+    const Material* material = get_material();
 
-    // Retrieve or compute the first tangent direction (non-normalized).
-    // Reference: Physically Based Rendering, first edition, pp. 133
-    const Vector3d tangent =
-        (m_members & HasTriangleVertexTangents) != 0
-            ? m_assembly_instance_transform.vector_to_parent(
-                  m_object_instance->get_transform().vector_to_parent(
-                        Vector3d(m_t0) * static_cast<double>(1.0f - m_bary[0] - m_bary[1])
-                      + Vector3d(m_t1) * static_cast<double>(m_bary[0])
-                      + Vector3d(m_t2) * static_cast<double>(m_bary[1])))
-            : get_dpdu(0);
+    // Compute the first tangent.
+    Vector3d tangent;
+    const Transformd& object_instance_transform = m_object_instance->get_transform();
+    if ((m_members & HasTriangleVertexTangents) != 0)
+    {
+        // Explicit per-vertex tangents.
+        tangent =
+            m_assembly_instance_transform.vector_to_parent(
+                object_instance_transform.vector_to_parent(
+                      Vector3d(m_t0) * static_cast<double>(1.0f - m_bary[0] - m_bary[1])
+                    + Vector3d(m_t1) * static_cast<double>(m_bary[0])
+                    + Vector3d(m_t2) * static_cast<double>(m_bary[1])));
+    }
+    else if (material == nullptr ||
+             material->get_render_data().m_default_tangent_mode == Material::RenderData::DefaultTangentMode::Radial)
+    {
+        // Radial default tangent mode.
+        tangent =
+            get_point() -
+            m_assembly_instance_transform.point_to_parent(
+                object_instance_transform.get_parent_origin());
+    }
+    else
+    {
+        // UV/X+/Y+/Z+ default tangent modes.
+        switch (material->get_render_data().m_default_tangent_mode)
+        {
+          case Material::RenderData::DefaultTangentMode::UV:
+            tangent = normalize(get_dpdu(0));
+            break;
 
-    // Construct an orthonormal basis.
-    const Vector3d t = normalize(cross(tangent, sn));
-    const Vector3d s = normalize(cross(sn, t));
-    m_shading_basis.build(sn, s, t);
+          case Material::RenderData::DefaultTangentMode::LocalX:
+            tangent = m_assembly_instance_transform.vector_to_parent(object_instance_transform.get_parent_x());
+            break;
+
+          case Material::RenderData::DefaultTangentMode::LocalY:
+            tangent = m_assembly_instance_transform.vector_to_parent(object_instance_transform.get_parent_y());
+            break;
+
+          case Material::RenderData::DefaultTangentMode::LocalZ:
+            tangent = m_assembly_instance_transform.vector_to_parent(object_instance_transform.get_parent_z());
+            break;
+        }
+    }
+
+    if (m_primitive_type == PrimitiveCurve3)
+    {
+        // Contruct shading basis for hair BSDF.
+        // todo: add flag to differentiate curves from hair.
+        const Vector3d x = normalize(get_dpdu(0));
+        const Vector3d sn_curve = get_original_shading_normal();
+        const Vector3d z = normalize(cross(sn_curve, x));
+        const Vector3d y = cross(z, x);
+        m_shading_basis.build(y, x, z);
+    }
+    else
+    {
+        // Construct an orthonormal basis.
+        const Vector3d& sn = get_original_shading_normal();
+        const Vector3d bitangent = cross(tangent, sn);
+        const double norm_bitangent = norm(bitangent);
+        if (norm_bitangent >= 1.0e-6)
+        {
+            const Vector3d t = bitangent / norm_bitangent;
+            const Vector3d s = cross(sn, t);
+            m_shading_basis.build(sn, s, t);
+        }
+        else
+        {
+            // Fall back to arbitrary tangents if the tangent and the shading normal are colinear.
+            m_shading_basis.build(sn);
+        }
+    }
 
     // Apply the basis modifier if the material has one.
-    if (m_primitive_type == PrimitiveTriangle)
+    if (material != nullptr)
     {
-        const Material* material = get_material();
-        if (material)
+        const Material::RenderData& material_data = material->get_render_data();
+        if (material_data.m_basis_modifier)
         {
-            const Material::RenderData& material_data = material->get_render_data();
-            if (material_data.m_basis_modifier)
-            {
-                m_shading_basis =
-                    material_data.m_basis_modifier->modify(
-                        *m_texture_cache,
-                        m_shading_basis,
-                        *this);
-            }
+            m_shading_basis =
+                material_data.m_basis_modifier->modify(
+                    *m_texture_cache,
+                    m_shading_basis,
+                    *this);
         }
     }
 }
@@ -893,7 +925,7 @@ void ShadingPoint::compute_world_space_point_velocity() const
     // Transform positions to world space.
     if (m_assembly_instance_transform_seq->size() > 1)
     {
-        const Camera* camera = m_scene->get_active_camera();
+        const Camera* camera = m_scene->get_render_data().m_active_camera;
         Transformd scratch;
 
         const Transformd& assembly_instance_transform0 =
@@ -926,7 +958,7 @@ void ShadingPoint::compute_alpha() const
       case PrimitiveTriangle:
       case PrimitiveProceduralSurface:
         {
-            if (const Source* alpha_map = get_object().get_alpha_map())
+            if (const Source* alpha_map = get_object().get_render_data().m_alpha_map)
             {
                 Alpha a;
                 alpha_map->evaluate(*m_texture_cache, SourceInputs(get_uv(0)), a);
@@ -970,26 +1002,23 @@ void ShadingPoint::compute_alpha() const
 
 void ShadingPoint::compute_per_vertex_color() const
 {
-    m_color = Color3f(1.0f);
-
     switch (m_primitive_type)
     {
       case PrimitiveTriangle:
       case PrimitiveProceduralSurface:
+        m_color.set(1.0f);
         break;
 
       case PrimitiveCurve1:
         {
-            assert(is_curve_primitive());
             const GScalar v = m_bary[1];
-            const CurveObject *curves = static_cast<const CurveObject *>(&get_object());
+            const CurveObject* curves = static_cast<const CurveObject*>(&get_object());
             m_color = Color3f(curves->get_curve1(m_primitive_index).evaluate_color(v));
         }
         break;
 
       case PrimitiveCurve3:
         {
-            assert(is_curve_primitive());
             const GScalar v = m_bary[1];
             const CurveObject* curves = static_cast<const CurveObject*>(&get_object());
             m_color = Color3f(curves->get_curve3(m_primitive_index).evaluate_color(v));
@@ -1010,25 +1039,24 @@ void ShadingPoint::initialize_osl_shader_globals(
 
     if (!(m_members & HasOSLShaderGlobals))
     {
-        const ShadingRay& ray = get_ray();
-        assert(is_normalized(ray.m_dir));
+        assert(is_normalized(m_ray.m_dir));
 
         // Surface position and incident ray direction.
         m_shader_globals.P = Vector3f(get_point());
-        m_shader_globals.I = Vector3f(ray.m_dir);
+        m_shader_globals.I = Vector3f(m_ray.m_dir);
 
         m_shader_globals.flipHandedness =
             m_assembly_instance_transform_seq->swaps_handedness(m_assembly_instance_transform) !=
-            get_object_instance().transform_swaps_handedness() ? 1 : 0;
+            get_object_instance().get_render_data().m_transform_swaps_handedness ? 1 : 0;
 
         // Surface position and incident ray direction differentials.
-        if (ray.m_has_differentials)
+        if (m_ray.m_has_differentials)
         {
             m_shader_globals.dPdx = Vector3f(get_dpdx());
             m_shader_globals.dPdy = Vector3f(get_dpdy());
             m_shader_globals.dPdz = Vector3f(0.0);
-            m_shader_globals.dIdx = Vector3f(ray.m_rx.m_dir - ray.m_dir);
-            m_shader_globals.dIdy = Vector3f(ray.m_ry.m_dir - ray.m_dir);
+            m_shader_globals.dIdx = Vector3f(m_ray.m_rx_dir - m_ray.m_dir);
+            m_shader_globals.dIdy = Vector3f(m_ray.m_ry_dir - m_ray.m_dir);
         }
         else
         {
@@ -1048,7 +1076,7 @@ void ShadingPoint::initialize_osl_shader_globals(
         const Vector2f& uv = get_uv(0);
         m_shader_globals.u = uv[0];
         m_shader_globals.v = uv[1];
-        if (ray.m_has_differentials)
+        if (m_ray.m_has_differentials)
         {
             const Vector2f& duvdx = get_duvdx(0);
             const Vector2f& duvdy = get_duvdy(0);
@@ -1070,8 +1098,8 @@ void ShadingPoint::initialize_osl_shader_globals(
         m_shader_globals.dPdv = Vector3f(get_dpdv(0));
 
         // Time and its derivative.
-        m_shader_globals.time = ray.m_time.m_absolute;
-        m_shader_globals.dtime = m_scene->get_active_camera()->get_shutter_time_interval();
+        m_shader_globals.time = m_ray.m_time.m_absolute;
+        m_shader_globals.dtime = m_scene->get_render_data().m_active_camera->get_shutter_time_interval();
 
         // Velocity vector.
         m_shader_globals.dPdtime =
@@ -1180,125 +1208,124 @@ class PoisonImpl<OSL::Vec3>
   public:
     static void do_poison(OSL::Vec3& v)
     {
-        poison(v.x);
-        poison(v.y);
-        poison(v.z);
+        always_poison(v.x);
+        always_poison(v.y);
+        always_poison(v.z);
     }
 };
 
 void PoisonImpl<renderer::ShadingPoint>::do_poison(renderer::ShadingPoint& point)
 {
-    poison(point.m_texture_cache);
-    poison(point.m_scene);
-    poison(point.m_ray);
+    always_poison(point.m_texture_cache);
+    always_poison(point.m_scene);
+    always_poison(point.m_ray);
 
-    poison(point.m_primitive_type);
-    poison(point.m_bary);
-    poison(point.m_assembly_instance);
-    poison(point.m_assembly_instance_transform);
-    poison(point.m_assembly_instance_transform_seq);
-    poison(point.m_object_instance_index);
-    poison(point.m_primitive_index);
-    poison(point.m_triangle_support_plane);
+    always_poison(point.m_primitive_type);
+    always_poison(point.m_bary);
+    always_poison(point.m_assembly_instance);
+    always_poison(point.m_assembly_instance_transform);
+    always_poison(point.m_assembly_instance_transform_seq);
+    always_poison(point.m_object_instance_index);
+    always_poison(point.m_primitive_index);
+    always_poison(point.m_triangle_support_plane);
 
-    poison(point.m_members);
+    always_poison(point.m_members);
 
-    poison(point.m_assembly);
-    poison(point.m_object_instance);
-    poison(point.m_object);
-    poison(point.m_primitive_pa);
-    poison(point.m_v0_uv);
-    poison(point.m_v1_uv);
-    poison(point.m_v2_uv);
-    poison(point.m_v0);
-    poison(point.m_v1);
-    poison(point.m_v2);
-    poison(point.m_n0);
-    poison(point.m_n1);
-    poison(point.m_n2);
-    poison(point.m_t0);
-    poison(point.m_t1);
-    poison(point.m_t2);
+    always_poison(point.m_assembly);
+    always_poison(point.m_object_instance);
+    always_poison(point.m_object);
+    always_poison(point.m_primitive_pa);
+    always_poison(point.m_v0_uv);
+    always_poison(point.m_v1_uv);
+    always_poison(point.m_v2_uv);
+    always_poison(point.m_v0);
+    always_poison(point.m_v1);
+    always_poison(point.m_v2);
+    always_poison(point.m_n0);
+    always_poison(point.m_n1);
+    always_poison(point.m_n2);
+    always_poison(point.m_t0);
+    always_poison(point.m_t1);
+    always_poison(point.m_t2);
 
-    poison(point.m_uv);
-    poison(point.m_duvdx);
-    poison(point.m_duvdy);
-    poison(point.m_point);
-    poison(point.m_biased_point);
-    poison(point.m_dpdu);
-    poison(point.m_dpdv);
-    poison(point.m_dndu);
-    poison(point.m_dndv);
-    poison(point.m_dpdx);
-    poison(point.m_dpdy);
-    poison(point.m_geometric_normal);
-    poison(point.m_original_shading_normal);
-    poison(point.m_shading_basis);
-    poison(point.m_side);
-    poison(point.m_v0_w);
-    poison(point.m_v1_w);
-    poison(point.m_v2_w);
-    poison(point.m_point_velocity);
-    poison(point.m_material);
-    poison(point.m_opposite_material);
-    poison(point.m_alpha);
-    poison(point.m_color);
+    always_poison(point.m_uv);
+    always_poison(point.m_duvdx);
+    always_poison(point.m_duvdy);
+    always_poison(point.m_point);
+    always_poison(point.m_dpdu);
+    always_poison(point.m_dpdv);
+    always_poison(point.m_dndu);
+    always_poison(point.m_dndv);
+    always_poison(point.m_dpdx);
+    always_poison(point.m_dpdy);
+    always_poison(point.m_geometric_normal);
+    always_poison(point.m_original_shading_normal);
+    always_poison(point.m_shading_basis);
+    always_poison(point.m_side);
+    always_poison(point.m_v0_w);
+    always_poison(point.m_v1_w);
+    always_poison(point.m_v2_w);
+    always_poison(point.m_point_velocity);
+    always_poison(point.m_material);
+    always_poison(point.m_opposite_material);
+    always_poison(point.m_alpha);
+    always_poison(point.m_color);
 
-    poison(point.m_asm_geo_normal);
-    poison(point.m_front_point);
-    poison(point.m_back_point);
+    always_poison(point.m_refine_space_geo_normal);
+    always_poison(point.m_refine_space_front_point);
+    always_poison(point.m_refine_space_back_point);
 
-    poison(point.m_obj_transform_info.m_assembly_instance_transform);
-    poison(point.m_obj_transform_info.m_object_instance_transform);
+    always_poison(point.m_obj_transform_info.m_assembly_instance_transform);
+    always_poison(point.m_obj_transform_info.m_object_instance_transform);
 
-    poison(point.m_osl_trace_data.m_traced);
-    poison(point.m_osl_trace_data.m_hit);
-    poison(point.m_osl_trace_data.m_hit_distance);
-    poison(point.m_osl_trace_data.m_P);
-    poison(point.m_osl_trace_data.m_N);
-    poison(point.m_osl_trace_data.m_Ng);
-    poison(point.m_osl_trace_data.m_u);
-    poison(point.m_osl_trace_data.m_v);
+    always_poison(point.m_osl_trace_data.m_traced);
+    always_poison(point.m_osl_trace_data.m_hit);
+    always_poison(point.m_osl_trace_data.m_hit_distance);
+    always_poison(point.m_osl_trace_data.m_P);
+    always_poison(point.m_osl_trace_data.m_N);
+    always_poison(point.m_osl_trace_data.m_Ng);
+    always_poison(point.m_osl_trace_data.m_u);
+    always_poison(point.m_osl_trace_data.m_v);
 
-    poison(point.m_shader_globals.P);
-    poison(point.m_shader_globals.dPdx);
-    poison(point.m_shader_globals.dPdy);
-    poison(point.m_shader_globals.dPdz);
-    poison(point.m_shader_globals.I);
-    poison(point.m_shader_globals.dIdx);
-    poison(point.m_shader_globals.dIdy);
-    poison(point.m_shader_globals.N);
-    poison(point.m_shader_globals.Ng);
-    poison(point.m_shader_globals.u);
-    poison(point.m_shader_globals.dudx);
-    poison(point.m_shader_globals.dudy);
-    poison(point.m_shader_globals.v);
-    poison(point.m_shader_globals.dvdx);
-    poison(point.m_shader_globals.dvdy);
-    poison(point.m_shader_globals.dPdu);
-    poison(point.m_shader_globals.dPdv);
-    poison(point.m_shader_globals.time);
-    poison(point.m_shader_globals.dtime);
-    poison(point.m_shader_globals.dPdtime);
-    poison(point.m_shader_globals.Ps);
-    poison(point.m_shader_globals.dPsdx);
-    poison(point.m_shader_globals.dPsdy);
-    poison(point.m_shader_globals.renderstate);
-    poison(point.m_shader_globals.tracedata);
-    poison(point.m_shader_globals.objdata);
-    poison(point.m_shader_globals.context);
-    poison(point.m_shader_globals.renderer);
-    poison(point.m_shader_globals.object2common);
-    poison(point.m_shader_globals.shader2common);
-    poison(point.m_shader_globals.Ci);
-    poison(point.m_shader_globals.surfacearea);
-    poison(point.m_shader_globals.raytype);
-    poison(point.m_shader_globals.flipHandedness);
-    poison(point.m_shader_globals.backfacing);
+    always_poison(point.m_shader_globals.P);
+    always_poison(point.m_shader_globals.dPdx);
+    always_poison(point.m_shader_globals.dPdy);
+    always_poison(point.m_shader_globals.dPdz);
+    always_poison(point.m_shader_globals.I);
+    always_poison(point.m_shader_globals.dIdx);
+    always_poison(point.m_shader_globals.dIdy);
+    always_poison(point.m_shader_globals.N);
+    always_poison(point.m_shader_globals.Ng);
+    always_poison(point.m_shader_globals.u);
+    always_poison(point.m_shader_globals.dudx);
+    always_poison(point.m_shader_globals.dudy);
+    always_poison(point.m_shader_globals.v);
+    always_poison(point.m_shader_globals.dvdx);
+    always_poison(point.m_shader_globals.dvdy);
+    always_poison(point.m_shader_globals.dPdu);
+    always_poison(point.m_shader_globals.dPdv);
+    always_poison(point.m_shader_globals.time);
+    always_poison(point.m_shader_globals.dtime);
+    always_poison(point.m_shader_globals.dPdtime);
+    always_poison(point.m_shader_globals.Ps);
+    always_poison(point.m_shader_globals.dPsdx);
+    always_poison(point.m_shader_globals.dPsdy);
+    always_poison(point.m_shader_globals.renderstate);
+    always_poison(point.m_shader_globals.tracedata);
+    always_poison(point.m_shader_globals.objdata);
+    always_poison(point.m_shader_globals.context);
+    always_poison(point.m_shader_globals.renderer);
+    always_poison(point.m_shader_globals.object2common);
+    always_poison(point.m_shader_globals.shader2common);
+    always_poison(point.m_shader_globals.Ci);
+    always_poison(point.m_shader_globals.surfacearea);
+    always_poison(point.m_shader_globals.raytype);
+    always_poison(point.m_shader_globals.flipHandedness);
+    always_poison(point.m_shader_globals.backfacing);
 
-    poison(point.m_surface_shader_diffuse);
-    poison(point.m_surface_shader_glossy);
-    poison(point.m_surface_shader_emission);
+    always_poison(point.m_surface_shader_diffuse);
+    always_poison(point.m_surface_shader_glossy);
+    always_poison(point.m_surface_shader_emission);
 }
 
 }   // namespace foundation

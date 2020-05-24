@@ -34,10 +34,8 @@
 #include "renderer/modeling/entity/entity.h"
 
 // appleseed.foundation headers.
+#include "foundation/string/string.h"
 #include "foundation/utility/api/apistring.h"
-#include "foundation/utility/string.h"
-
-using namespace std;
 
 namespace renderer
 {
@@ -48,7 +46,7 @@ namespace renderer
 
 struct MessageContext::Impl
 {
-    string m_message;
+    std::string m_message;
 };
 
 MessageContext::MessageContext()

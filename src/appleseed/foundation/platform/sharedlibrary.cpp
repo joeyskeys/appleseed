@@ -37,8 +37,6 @@
 #include <dlfcn.h>
 #endif
 
-using namespace std;
-
 namespace foundation
 {
 
@@ -50,7 +48,7 @@ ExceptionCannotLoadSharedLib::ExceptionCannotLoadSharedLib(
     const char* path,
     const char* error_msg)
 {
-    string err("Cannot load shared library ");
+    std::string err("Cannot load shared library ");
     err += path;
     err += ": ";
     err += error_msg;
@@ -66,22 +64,9 @@ ExceptionSharedLibCannotGetSymbol::ExceptionSharedLibCannotGetSymbol(
     const char* symbol_name,
     const char* error_msg)
 {
-    string err("Cannot get symbol ");
+    std::string err("Cannot get symbol ");
     err += symbol_name;
     err += ": ";
-    err += error_msg;
-    set_what(err.c_str());
-}
-
-
-//
-// ExceptionSharedLibNotFound class implementation.
-//
-
-ExceptionSharedLibNotFound::ExceptionSharedLibNotFound(const char* error_msg)
-{
-    string err("Cannot find shared library ");
-    err += ". Error = ";
     err += error_msg;
     set_what(err.c_str());
 }
@@ -93,10 +78,10 @@ ExceptionSharedLibNotFound::ExceptionSharedLibNotFound(const char* error_msg)
 
 namespace
 {
-    string get_last_error_message()
+    std::string get_last_error_message()
     {
 #ifdef _WIN32
-        return get_windows_last_error_message();
+        return get_last_windows_error_message();
 #else
         return dlerror();
 #endif
@@ -122,11 +107,7 @@ SharedLibrary::SharedLibrary(const char* path)
 #endif
 
     if (m_handle == nullptr)
-    {
-        throw ExceptionCannotLoadSharedLib(
-            path,
-            get_last_error_message().c_str());
-    }
+        throw ExceptionCannotLoadSharedLib(path, get_last_error_message().c_str());
 }
 
 SharedLibrary::~SharedLibrary()
@@ -147,36 +128,9 @@ void* SharedLibrary::get_symbol(const char* name, const bool no_throw) const
 #endif
 
     if (symbol == nullptr && !no_throw)
-    {
-        throw ExceptionSharedLibCannotGetSymbol(
-            name,
-            get_last_error_message().c_str());
-    }
+        throw ExceptionSharedLibCannotGetSymbol(name, get_last_error_message().c_str());
 
     return symbol;
-}
-
-APIString SharedLibrary::get_filename_from_symbol(const void* address)
-{
-#ifdef _WIN32
-    char path[MAX_PATH];
-    HMODULE m = nullptr;
-
-    if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(address), &m) == 0)
-        throw ExceptionSharedLibNotFound(get_last_error_message().c_str());
-
-    if (GetModuleFileName(m, path, sizeof(path)) == 0)
-        throw ExceptionSharedLibNotFound(get_last_error_message().c_str());
-
-    return APIString(path);
-#else
-    Dl_info info;
-
-    if (dladdr(address, &info) != 0)
-        return APIString(info.dli_fname);
-    else
-        throw ExceptionSharedLibNotFound(get_last_error_message().c_str());
-#endif
 }
 
 }   // namespace foundation

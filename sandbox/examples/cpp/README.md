@@ -4,9 +4,9 @@
 
 The following instructions assume that:
 
-- You are using Visual Studio 2015.
-- A [properly-patched Boost 1.55](https://github.com/appleseedhq/appleseed/wiki/Building-appleseed-on-Windows#boost) is installed in `C:\boost_1_55_0`.
-- [appleseed's dependency package](https://github.com/appleseedhq/appleseed/wiki/Building-appleseed-on-Windows#alternative-1-using-prebuilt-third-party-libraries) is installed in `C:\appleseed-deps`.
+- You are using Visual Studio 2017.
+- [Boost 1.69](https://github.com/appleseedhq/appleseed/wiki/Building-appleseed-on-Windows#boost) is installed in `C:\boost_1_69_0`.
+- [appleseed's dependency package](https://github.com/appleseedhq/appleseed/wiki/Building-appleseed-on-Windows#alternative-1-using-prebuilt-third-party-libraries) is installed in `C:\windows-deps`.
 
 Make sure to adapt them as required.
 
@@ -17,18 +17,18 @@ Open a Command Prompt inside a plugin's folder, then type:
       mkdir build
       cd build
       cmake ^
-      -G "Visual Studio 14 2015 Win64" ^
+      -G "Visual Studio 15 2017 Win64" ^
       -DAPPLESEED_INCLUDE_DIR=..\..\..\..\include ^
       -DAPPLESEED_LIBRARY=..\..\..\..\lib\appleseed.lib ^
-      -DBOOST_ROOT=C:\boost_1_55_0 ^
-      -DIMATH_INCLUDE_DIR=C:\appleseed-deps\stage\vc14\ilmbase-release\include ^
-      -DIMATH_MATH_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Imath-2_2.lib ^
-      -DIMATH_IEX_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Iex-2_2.lib ^
-      -DIMATH_HALF_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Half.lib ^
-      -DOPENEXR_INCLUDE_DIR=C:\appleseed-deps\stage\vc14\openexr-release\include ^
-      -DOPENEXR_IMF_LIBRARY=C:\appleseed-deps\stage\vc14\openexr-release\lib\IlmImf-2_2.lib ^
-      -DOPENEXR_THREADS_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\IlmThread-2_2.lib ^
-      -DAPPLESEED_DEPS_STAGE_DIR=C:\appleseed-deps\stage\vc14 ^
+      -DBOOST_ROOT=C:\boost_1_69_0 ^
+      -DIMATH_INCLUDE_DIR=C:\windows-deps\stage\vc141\ilmbase-release\include ^
+      -DIMATH_MATH_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Imath-2_2.lib ^
+      -DIMATH_IEX_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Iex-2_2.lib ^
+      -DIMATH_HALF_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Half.lib ^
+      -DOPENEXR_INCLUDE_DIR=C:\windows-deps\stage\vc141\openexr-release\include ^
+      -DOPENEXR_IMF_LIBRARY=C:\windows-deps\stage\vc141\openexr-release\lib\IlmImf-2_2.lib ^
+      -DOPENEXR_THREADS_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\IlmThread-2_2.lib ^
+      -DAPPLESEED_DEPS_STAGE_DIR=C:\windows-deps\stage\vc141 ^
       ..
 
 - With a **working copy** of the appleseed repository:
@@ -36,25 +36,25 @@ Open a Command Prompt inside a plugin's folder, then type:
       mkdir build
       cd build
       cmake ^
-      -G "Visual Studio 14 2015 Win64" ^
+      -G "Visual Studio 15 2017 Win64" ^
       -DAPPLESEED_INCLUDE_DIR=..\..\..\..\..\src\appleseed ^
-      -DAPPLESEED_LIBRARY=..\..\..\..\lib\v140\Ship\appleseed.lib ^
-      -DBOOST_ROOT=C:\boost_1_55_0 ^
-      -DIMATH_INCLUDE_DIR=C:\appleseed-deps\stage\vc14\ilmbase-release\include ^
-      -DIMATH_MATH_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Imath-2_2.lib ^
-      -DIMATH_IEX_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Iex-2_2.lib ^
-      -DIMATH_HALF_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\Half.lib ^
-      -DOPENEXR_INCLUDE_DIR=C:\appleseed-deps\stage\vc14\openexr-release\include ^
-      -DOPENEXR_IMF_LIBRARY=C:\appleseed-deps\stage\vc14\openexr-release\lib\IlmImf-2_2.lib ^
-      -DOPENEXR_THREADS_LIBRARY=C:\appleseed-deps\stage\vc14\ilmbase-release\lib\IlmThread-2_2.lib ^
-      -DAPPLESEED_DEPS_STAGE_DIR=C:\appleseed-deps\stage\vc14 ^
+      -DAPPLESEED_LIBRARY=..\..\..\..\lib\v141\Ship\appleseed.lib ^
+      -DBOOST_ROOT=C:\boost_1_69_0 ^
+      -DIMATH_INCLUDE_DIR=C:\windows-deps\stage\vc141\ilmbase-release\include ^
+      -DIMATH_MATH_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Imath-2_2.lib ^
+      -DIMATH_IEX_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Iex-2_2.lib ^
+      -DIMATH_HALF_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\Half.lib ^
+      -DOPENEXR_INCLUDE_DIR=C:\windows-deps\stage\vc141\openexr-release\include ^
+      -DOPENEXR_IMF_LIBRARY=C:\windows-deps\stage\vc141\openexr-release\lib\IlmImf-2_2.lib ^
+      -DOPENEXR_THREADS_LIBRARY=C:\windows-deps\stage\vc141\ilmbase-release\lib\IlmThread-2_2.lib ^
+      -DAPPLESEED_DEPS_STAGE_DIR=C:\windows-deps\stage\vc141 ^
       ..
 
 Open the Visual Studio solution file (.sln file) that was generated in `build\` and build the plugin in the configuration of your choice (Debug or Release).
 
 ## Compiling the Plugins on Linux
 
-The following instructions assume that you are using the prebuilt Linux dependencies that can be found [here](https://github.com/appleseedhq/prebuilt-linux-deps).
+The following instructions assume that you are using the prebuilt Linux dependencies that can be found [here](https://github.com/appleseedhq/linux-deps).
 
 Make sure to adapt them as required.
 

@@ -32,13 +32,11 @@
 
 // appleseed.foundation headers.
 #include "foundation/core/version.h"
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 // Standard headers.
 #include <sstream>
 #include <string>
-
-using namespace std;
 
 namespace foundation
 {
@@ -74,10 +72,16 @@ const char* Appleseed::get_lib_version()
 
 const char* Appleseed::get_lib_configuration()
 {
-#ifdef DEBUG
+#if defined APPLESEED_DEBUG
     return "Debug";
-#else
+#elif defined APPLESEED_RELEASE
     return "Release";
+#elif defined APPLESEED_PROFILE
+    return "Profile";
+#elif defined APPLESEED_SHIP
+    return "Ship";
+#else
+    return "Unknown";
 #endif
 }
 
@@ -95,11 +99,11 @@ namespace
 {
     struct LibCPUFeaturesString
     {
-        string m_value;
+        std::string m_value;
 
         LibCPUFeaturesString()
         {
-            stringstream sstr;
+            std::stringstream sstr;
 
 #ifdef APPLESEED_USE_SSE
             sstr << "SSE SSE2 ";
@@ -136,11 +140,11 @@ namespace
 {
     struct SyntheticVersionString
     {
-        string m_value;
+        std::string m_value;
 
         SyntheticVersionString()
         {
-            stringstream sstr;
+            std::stringstream sstr;
 
             sstr << Appleseed::get_lib_name();
             sstr << " version ";

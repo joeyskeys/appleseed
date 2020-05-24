@@ -31,6 +31,15 @@ import argparse
 import os
 import sys
 
+from utils import print_runtime_details  # local module
+
+
+# -------------------------------------------------------------------------------------------------
+# Constants.
+# -------------------------------------------------------------------------------------------------
+
+VERSION = "1.0"
+
 
 # -------------------------------------------------------------------------------------------------
 # Utility functions.
@@ -89,6 +98,8 @@ def main():
     parser.add_argument("path", help="file or directory to process")
     args = parser.parse_args()
 
+    print_runtime_details("sortincludes", VERSION, os.path.realpath(__file__))
+
     if os.path.isfile(args.path):
         process_file(args.path)
     else:
@@ -97,5 +108,6 @@ def main():
             if ext == ".h" or ext == ".cpp":
                 process_file(filepath)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

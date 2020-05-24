@@ -40,11 +40,10 @@
 // appleseed.foundation headers.
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/image.h"
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -57,10 +56,10 @@ ProjectBuilder::ProjectBuilder(Project& project)
 Frame* ProjectBuilder::edit_frame(
     const Dictionary&   values) const
 {
-    const string name = get_entity_name(values);
+    const std::string name = get_entity_name(values);
 
     Dictionary clean_values(values);
-    clean_values.strings().remove(EntityEditorFormFactoryBase::NameParameter);
+    clean_values.strings().remove(EntityEditorFormFactoryBase::NameParameter.c_str());
 
     Frame* old_frame = m_project.get_frame();
     const size_t old_canvas_width = old_frame->image().properties().m_canvas_width;
@@ -87,13 +86,13 @@ void ProjectBuilder::slot_notify_project_modification() const
     emit signal_project_modified();
 }
 
-string ProjectBuilder::get_entity_name(const Dictionary& values)
+std::string ProjectBuilder::get_entity_name(const Dictionary& values)
 {
-    if (!values.strings().exist(EntityEditorFormFactoryBase::NameParameter))
+    if (!values.strings().exist(EntityEditorFormFactoryBase::NameParameter.c_str()))
         throw ExceptionInvalidEntityName();
 
-    const string name = trim_both(
-        values.get<string>(EntityEditorFormFactoryBase::NameParameter));
+    const std::string name = trim_both(
+        values.get<std::string>(EntityEditorFormFactoryBase::NameParameter.c_str()));
 
     if (!is_valid_entity_name(name))
         throw ExceptionInvalidEntityName();
@@ -101,7 +100,7 @@ string ProjectBuilder::get_entity_name(const Dictionary& values)
     return name;
 }
 
-bool ProjectBuilder::is_valid_entity_name(const string& name)
+bool ProjectBuilder::is_valid_entity_name(const std::string& name)
 {
     return !name.empty();
 }

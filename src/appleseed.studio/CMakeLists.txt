@@ -34,12 +34,12 @@
 
 # Boost.
 if (NOT PYTHON_MAJOR_VERSION STREQUAL "2")
-    message (FATAL_ERROR "Python 2.x needed")
+    message (FATAL_ERROR "Python 2.x needed.")
 else ()
-    if (Boost_VERSION_STRING VERSION_GREATER_EQUAL 1.67)
-        find_package (Boost 1.61 COMPONENTS python27)
+    if (Boost_VERSION GREATER_EQUAL 106700)
+        find_package (Boost 1.61 REQUIRED COMPONENTS python27)
     else ()
-        find_package (Boost 1.61 COMPONENTS python)
+        find_package (Boost 1.61 REQUIRED COMPONENTS python)
     endif ()
 endif ()
 
@@ -47,7 +47,7 @@ endif ()
 find_package (OpenGL REQUIRED)
 
 # Qt 5.
-find_package (Qt5 COMPONENTS Core Concurrent OpenGL Widgets REQUIRED)
+find_package (Qt5 REQUIRED COMPONENTS Concurrent Core OpenGL Widgets)
 
 
 #--------------------------------------------------------------------------------------------------
@@ -108,6 +108,12 @@ set (main_sources
     main/commandlinehandler.h
     main/main.cpp
 )
+if (WIN32)
+    set (main_sources
+        ${main_sources}
+        main/windowsapp.manifest
+    )
+endif ()
 list (APPEND appleseed.studio_sources
     ${main_sources}
 )
@@ -184,8 +190,6 @@ set (mainwindow_project_sources
     mainwindow/project/projectexplorer.h
     mainwindow/project/projectitem.cpp
     mainwindow/project/projectitem.h
-    mainwindow/project/projectmanager.cpp
-    mainwindow/project/projectmanager.h
     mainwindow/project/sceneitem.cpp
     mainwindow/project/sceneitem.h
     mainwindow/project/searchpathswindow.cpp
@@ -204,17 +208,6 @@ set (mainwindow_project_sources
     mainwindow/project/tools.cpp
     mainwindow/project/tools.h
 )
-if (WITH_DISNEY_MATERIAL)
-    list (APPEND mainwindow_project_sources
-        mainwindow/project/expressioneditorwindow.cpp
-        mainwindow/project/expressioneditorwindow.h
-        mainwindow/project/expressioneditorwindow.ui
-        mainwindow/project/disneymaterialcustomui.cpp
-        mainwindow/project/disneymaterialcustomui.h
-        mainwindow/project/disneymateriallayerui.cpp
-        mainwindow/project/disneymateriallayerui.h
-    )
-endif ()
 list (APPEND appleseed.studio_sources
     ${mainwindow_project_sources}
 )
@@ -268,13 +261,10 @@ set (mainwindow_rendering_sources
     mainwindow/rendering/renderclipboardhandler.h
     mainwindow/rendering/renderingmanager.cpp
     mainwindow/rendering/renderingmanager.h
-    mainwindow/rendering/renderingtimer.h
     mainwindow/rendering/renderregionhandler.cpp
     mainwindow/rendering/renderregionhandler.h
     mainwindow/rendering/rendertab.cpp
     mainwindow/rendering/rendertab.h
-    mainwindow/rendering/renderwidget.cpp
-    mainwindow/rendering/renderwidget.h
     mainwindow/rendering/scenepickinghandler.cpp
     mainwindow/rendering/scenepickinghandler.h
 )
@@ -297,15 +287,11 @@ set (mainwindow_sources
     mainwindow/falsecolorswindow.cpp
     mainwindow/falsecolorswindow.h
     mainwindow/falsecolorswindow.ui
-    mainwindow/logwidget.cpp
-    mainwindow/logwidget.h
     mainwindow/mainwindow.cpp
     mainwindow/mainwindow.h
     mainwindow/mainwindow.ui
     mainwindow/minimizebutton.cpp
     mainwindow/minimizebutton.h
-    mainwindow/qtlogtarget.cpp
-    mainwindow/qtlogtarget.h
     mainwindow/renderingsettingswindow.cpp
     mainwindow/renderingsettingswindow.h
     mainwindow/renderingsettingswindow.ui
@@ -317,17 +303,6 @@ list (APPEND appleseed.studio_sources
 )
 source_group ("mainwindow" FILES
     ${mainwindow_sources}
-)
-
-set (meta_tests_sources
-    meta/tests/test_interop.cpp
-    meta/tests/test_projectmanager.cpp
-)
-list (APPEND appleseed.studio_sources
-    ${meta_tests_sources}
-)
-source_group ("meta\\tests" FILES
-    ${meta_tests_sources}
 )
 
 set (python_sources
@@ -355,28 +330,9 @@ source_group ("python\\studio" FILES
 )
 
 set (utility_sources
-    utility/chartwidget.cpp
-    utility/chartwidget.h
-    utility/doubleslider.cpp
-    utility/doubleslider.h
-    utility/foldablepanelwidget.cpp
-    utility/foldablepanelwidget.h
     utility/inputwidgetproxies.cpp
     utility/inputwidgetproxies.h
-    utility/interop.h
-    utility/miscellaneous.cpp
-    utility/miscellaneous.h
-    utility/mousecoordinatestracker.cpp
-    utility/mousecoordinatestracker.h
-    utility/mousewheelfocuseventfilter.cpp
-    utility/mousewheelfocuseventfilter.h
-    utility/scrollareapanhandler.cpp
-    utility/scrollareapanhandler.h
     utility/settingskeys.h
-    utility/treewidget.cpp
-    utility/treewidget.h
-    utility/widgetzoomhandler.cpp
-    utility/widgetzoomhandler.h
     utility/windowbase.cpp
     utility/windowbase.h
 )
@@ -409,66 +365,6 @@ if (WIN32)
         ${windows_resources}
     )
 endif ()
-
-set (appleseedpython_sources
-    ../appleseed.python/__init__.py
-    ../appleseed.python/bindaov.cpp
-    ../appleseed.python/bindappleseed.cpp
-    ../appleseed.python/bindassembly.cpp
-    ../appleseed.python/bindbasis.cpp
-    ../appleseed.python/bindbbox.cpp
-    ../appleseed.python/bindbsdf.cpp
-    ../appleseed.python/bindbssrdf.cpp
-    ../appleseed.python/bindcamera.cpp
-    ../appleseed.python/bindcolor.cpp
-    ../appleseed.python/bindcurveobject.cpp
-    ../appleseed.python/binddisplay.cpp
-    ../appleseed.python/bindedf.cpp
-    ../appleseed.python/bindentity.cpp
-    ../appleseed.python/bindentitycontainers.h
-    ../appleseed.python/bindenvironment.cpp
-    ../appleseed.python/bindframe.cpp
-    ../appleseed.python/bindfresnel.cpp
-    ../appleseed.python/bindimage.cpp
-    ../appleseed.python/bindlight.cpp
-    ../appleseed.python/bindlogger.cpp
-    ../appleseed.python/bindmasterrenderer.cpp
-    ../appleseed.python/bindmaterial.cpp
-    ../appleseed.python/bindmatrix.cpp
-    ../appleseed.python/bindmeshobject.cpp
-    ../appleseed.python/bindmurmurhash.cpp
-    ../appleseed.python/bindobject.cpp
-    ../appleseed.python/bindpostprocessingstage.cpp
-    ../appleseed.python/bindproject.cpp
-    ../appleseed.python/bindquaternion.cpp
-    ../appleseed.python/bindrenderercontroller.cpp
-    ../appleseed.python/bindscene.cpp
-    ../appleseed.python/bindshadercompiler.cpp
-    ../appleseed.python/bindshadergroup.cpp
-    ../appleseed.python/bindshaderquery.cpp
-    ../appleseed.python/bindsurfaceshader.cpp
-    ../appleseed.python/bindtexture.cpp
-    ../appleseed.python/bindtilecallback.cpp
-    ../appleseed.python/bindtransform.cpp
-    ../appleseed.python/bindutility.cpp
-    ../appleseed.python/bindvector.cpp
-    ../appleseed.python/bindvolume.cpp
-    ../appleseed.python/dict2dict.cpp
-    ../appleseed.python/dict2dict.h
-    ../appleseed.python/gillocks.h
-    ../appleseed.python/gillocks.cpp
-    ../appleseed.python/logtarget.py
-    ../appleseed.python/metadata.h
-    ../appleseed.python/module.cpp
-    ../appleseed.python/unalignedmatrix44.h
-    ../appleseed.python/unalignedtransform.h
-)
-list (APPEND appleseed.studio_sources
-    ${appleseedpython_sources}
-)
-source_group ("appleseed.python" FILES
-    ${appleseedpython_sources}
-)
 
 
 #--------------------------------------------------------------------------------------------------
@@ -535,6 +431,7 @@ QT5_ADD_RESOURCES (appleseed.studio_resource_files
 
 add_executable (appleseed.studio
     ${appleseed.studio_sources}
+    $<TARGET_OBJECTS:appleseed.py2.obj>
     ${appleseed.studio_generated_ui_files}
     ${appleseed.studio_generated_moc_h_files}
     ${appleseed.studio_resource_files}
@@ -562,7 +459,8 @@ endif ()
 
 include_directories (
     .
-    ../appleseed.shared
+    ../appleseed.common
+    ../appleseed.qtcommon
     ${OPENCOLORIO_INCLUDE_DIRS}
     ${PYTHON_INCLUDE_DIRS}
 )
@@ -586,7 +484,8 @@ link_against_ocio (appleseed.studio)
 
 target_link_libraries (appleseed.studio
     appleseed
-    appleseed.shared
+    appleseed.common
+    appleseed.qtcommon
     ${Boost_LIBRARIES}
     Qt5::Core
     Qt5::Concurrent
@@ -595,10 +494,6 @@ target_link_libraries (appleseed.studio
     ${OPENGL_LIBRARY}
     ${PYTHON_LIBRARIES}
 )
-
-if (WITH_DISNEY_MATERIAL)
-    link_against_seexpreditor (appleseed.studio)
-endif ()
 
 
 #--------------------------------------------------------------------------------------------------
@@ -637,10 +532,6 @@ install (FILES ../../sandbox/settings/appleseed.studio.xml
 )
 
 install (DIRECTORY ../../sandbox/ocio
-    DESTINATION .
-)
-
-install (DIRECTORY ../../sandbox/seexpr
     DESTINATION .
 )
 

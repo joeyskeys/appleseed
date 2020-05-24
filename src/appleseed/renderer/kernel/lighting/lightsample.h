@@ -30,16 +30,16 @@
 #pragma once
 
 // appleseed.renderer headers.
-#include "renderer/kernel/lighting/lighttree.h"
 #include "renderer/kernel/lighting/lighttypes.h"
 
 // appleseed.foundation headers.
-#include "foundation/math/hash.h"
-#include "foundation/utility/containers/hashtable.h"
+#include "foundation/containers/hashtable.h"
+#include "foundation/hash/hash.h"
 #include "foundation/utility/uid.h"
 
 // Standard headers.
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 // Forward declarations.
@@ -57,14 +57,14 @@ class EmittingShapeKey
 {
   public:
     foundation::UniqueID            m_assembly_instance_uid;
-    foundation::uint32              m_object_instance_index;
-    foundation::uint32              m_shape_index;
+    std::uint32_t                   m_object_instance_index;
+    std::uint32_t                   m_primitive_index;
 
     EmittingShapeKey();
     EmittingShapeKey(
         const foundation::UniqueID  assembly_instance_uid,
         const size_t                object_instance_index,
-        const size_t                shape_index);
+        const size_t                primitive_index);
 
     bool operator==(const EmittingShapeKey& rhs) const;
 };
@@ -98,7 +98,7 @@ class LightSample
 
     // Data for a light-emitting shape sample.
     const EmittingShape*        m_shape;
-    foundation::Vector2f        m_bary;                         // barycentric coordinates of the sample
+    foundation::Vector2f        m_param_coords;                 // parametric coordinates of the sample
     foundation::Vector3d        m_point;                        // world space position of the sample
     foundation::Vector3d        m_shading_normal;               // world space shading normal at the sample, unit-length
     foundation::Vector3d        m_geometric_normal;             // world space geometric normal at the sample, unit-length
@@ -129,17 +129,17 @@ inline EmittingShapeKey::EmittingShapeKey()
 inline EmittingShapeKey::EmittingShapeKey(
     const foundation::UniqueID              assembly_instance_uid,
     const size_t                            object_instance_index,
-    const size_t                            shape_index)
-  : m_assembly_instance_uid(static_cast<foundation::uint32>(assembly_instance_uid))
-  , m_object_instance_index(static_cast<foundation::uint32>(object_instance_index))
-  , m_shape_index(static_cast<foundation::uint32>(shape_index))
+    const size_t                            primitive_index)
+  : m_assembly_instance_uid(static_cast<std::uint32_t>(assembly_instance_uid))
+  , m_object_instance_index(static_cast<std::uint32_t>(object_instance_index))
+  , m_primitive_index(static_cast<std::uint32_t>(primitive_index))
 {
 }
 
 inline bool EmittingShapeKey::operator==(const EmittingShapeKey& rhs) const
 {
     return
-        m_shape_index == rhs.m_shape_index &&
+        m_primitive_index == rhs.m_primitive_index &&
         m_object_instance_index == rhs.m_object_instance_index &&
         m_assembly_instance_uid == rhs.m_assembly_instance_uid;
 }
@@ -153,9 +153,9 @@ inline size_t EmittingShapeKeyHasher::operator()(const EmittingShapeKey& key) co
 {
     return
         foundation::mix_uint32(
-            static_cast<foundation::uint32>(key.m_assembly_instance_uid),
+            static_cast<std::uint32_t>(key.m_assembly_instance_uid),
             key.m_object_instance_index,
-            key.m_shape_index);
+            key.m_primitive_index);
 }
 
 
@@ -167,6 +167,21 @@ inline LightSample::LightSample()
   : m_shape(nullptr)
   , m_light(nullptr)
 {
+}
+
+inline void LightSample::make_shading_point(
+    ShadingPoint&               shading_point,
+    const foundation::Vector3d& direction,
+    const Intersector&          intersector) const
+{
+    assert(m_shape && !m_light);
+
+    m_shape->make_shading_point(
+        shading_point,
+        m_point,
+        direction,
+        m_param_coords,
+        intersector);
 }
 
 }   // namespace renderer

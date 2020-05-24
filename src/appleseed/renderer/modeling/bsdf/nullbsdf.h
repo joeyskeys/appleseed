@@ -36,9 +36,8 @@
 #include "renderer/modeling/bsdf/bsdf.h"
 
 // appleseed.foundation headers.
-#include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/compiler.h"
 
 // Forward declarations.
 namespace renderer  { class BSDFSample; }
@@ -74,6 +73,8 @@ class NullBSDF
         const void*                     data,
         const bool                      adjoint,
         const bool                      cosine_mult,
+        const LocalGeometry&            local_geometry,
+        const foundation::Dual3f&       outgoing,
         const int                       modes,
         BSDFSample&                     sample) const override
     {
@@ -83,8 +84,7 @@ class NullBSDF
         const void*                     data,
         const bool                      adjoint,
         const bool                      cosine_mult,
-        const foundation::Vector3f&     geometric_normal,
-        const foundation::Basis3f&      shading_basis,
+        const LocalGeometry&            local_geometry,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
         const int                       modes,
@@ -96,8 +96,7 @@ class NullBSDF
     float evaluate_pdf(
         const void*                     data,
         const bool                      adjoint,
-        const foundation::Vector3f&     geometric_normal,
-        const foundation::Basis3f&      shading_basis,
+        const LocalGeometry&            local_geometry,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
         const int                       modes) const override

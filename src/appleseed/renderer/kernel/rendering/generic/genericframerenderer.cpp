@@ -45,28 +45,30 @@
 #include "renderer/utility/settingsparsing.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/core/concepts/noncopyable.h"
-#include "foundation/math/hash.h"
+#include "foundation/hash/hash.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/image.h"
 #include "foundation/platform/thread.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/job.h"
 #include "foundation/utility/statistics.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+// Forward declarations.
+namespace renderer { class IRendererController; }
+
 using namespace boost;
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -162,6 +164,11 @@ namespace
             m_tile_renderers.front()->print_settings();
         }
 
+        IRendererController* get_renderer_controller() override
+        {
+            return nullptr;
+        }
+
         void render() override
         {
             start_rendering();
@@ -255,8 +262,8 @@ namespace
 
             static TileJobFactory::TileOrdering get_tile_ordering(const ParamArray& params)
             {
-                const string tile_ordering =
-                    params.get_optional<string>("tile_ordering", "spiral");
+                const std::string tile_ordering =
+                    params.get_optional<std::string>("tile_ordering", "spiral");
 
                 if (tile_ordering == "linear")
                 {
@@ -294,8 +301,8 @@ namespace
             PassManagerFunc(
                 const Frame&                        frame,
                 IShadingResultFrameBufferFactory*   framebuffer_factory,
-                vector<ITileRenderer*>&             tile_renderers,
-                vector<ITileCallback*>&             tile_callbacks,
+                std::vector<ITileRenderer*>&        tile_renderers,
+                std::vector<ITileCallback*>&        tile_callbacks,
                 IPassCallback*                      pass_callback,
                 const Spectrum::Mode                spectrum_mode,
                 const TileJobFactory::TileOrdering  tile_ordering,
@@ -339,9 +346,9 @@ namespace
                     }
 
                     if (m_pass_count > 1)
-                        RENDERER_LOG_INFO("--- beginning rendering pass %s ---", pretty_uint(pass + 1).c_str());
+                        RENDERER_LOG_INFO("--- beginning rendering pass #%s ---", pretty_uint(pass + 1).c_str());
 
-                    // Invoke the pre-pass callback if there is one.
+                    // Invoke on_pass_begin() on the pass callback if there is one.
                     if (m_pass_callback)
                     {
                         assert(!m_job_queue.has_scheduled_or_running_jobs());
@@ -354,13 +361,14 @@ namespace
                         tile_callback->on_tiled_frame_begin(&m_frame);
 
                     // Create tile jobs.
-                    const uint32 pass_hash = mix_uint32(m_frame.get_noise_seed(), static_cast<uint32>(pass));
+                    const std::uint32_t pass_hash = mix_uint32(m_frame.get_noise_seed(), static_cast<std::uint32_t>(pass));
                     TileJobFactory::TileJobVector tile_jobs;
                     m_tile_job_factory.create(
                         m_frame,
                         m_tile_ordering,
                         m_tile_renderers,
                         m_tile_callbacks,
+                        m_thread_count,
                         pass_hash,
                         m_spectrum_mode,
                         tile_jobs,
@@ -377,7 +385,7 @@ namespace
                     for (auto tile_callback : m_tile_callbacks)
                         tile_callback->on_tiled_frame_end(&m_frame);
 
-                    // Invoke the post-pass callback if there is one.
+                    // Invoke on_pass_end() on the pass callback if there is one.
                     if (m_pass_callback)
                     {
                         assert(!m_job_queue.has_scheduled_or_running_jobs());
@@ -385,6 +393,7 @@ namespace
                         assert(!m_job_queue.has_scheduled_or_running_jobs());
                     }
 
+                    // Optionally write a checkpoint file to disk.
                     m_frame.save_checkpoint(m_framebuffer_factory, pass);
                 }
 
@@ -423,8 +432,8 @@ namespace
           private:
             const Frame&                            m_frame;
             IShadingResultFrameBufferFactory*       m_framebuffer_factory;
-            vector<ITileRenderer*>&                 m_tile_renderers;
-            vector<ITileCallback*>&                 m_tile_callbacks;
+            std::vector<ITileRenderer*>&            m_tile_renderers;
+            std::vector<ITileCallback*>&            m_tile_callbacks;
             IPassCallback*                          m_pass_callback;
             const Spectrum::Mode                    m_spectrum_mode;
             const TileJobFactory::TileOrdering      m_tile_ordering;
@@ -445,7 +454,7 @@ namespace
                     for (size_t ty = 0; ty < frame_props.m_tile_count_y; ++ty)
                     {
                         for (size_t tx = 0; tx < frame_props.m_tile_count_x; ++tx)
-                            tile_callback->on_tile_begin(&m_frame, tx, ty);
+                            tile_callback->on_tile_begin(&m_frame, tx, ty, 0, 1);
                     }
                 }
             }
@@ -470,19 +479,19 @@ namespace
         const Parameters                        m_params;
 
         JobQueue                                m_job_queue;
-        unique_ptr<JobManager>                  m_job_manager;
+        std::unique_ptr<JobManager>             m_job_manager;
         AbortSwitch                             m_abort_switch;
 
         IShadingResultFrameBufferFactory*       m_framebuffer_factory;
-        vector<ITileRenderer*>                  m_tile_renderers;   // tile renderers, one per thread
-        vector<ITileCallback*>                  m_tile_callbacks;   // tile callbacks, none or one per thread
+        std::vector<ITileRenderer*>             m_tile_renderers;   // tile renderers, one per thread
+        std::vector<ITileCallback*>             m_tile_callbacks;   // tile callbacks, none or one per thread
         IPassCallback*                          m_pass_callback;
 
         TileJobFactory                          m_tile_job_factory;
 
         bool                                    m_is_rendering;
-        unique_ptr<PassManagerFunc>             m_pass_manager_func;
-        unique_ptr<boost::thread>               m_pass_manager_thread;
+        std::unique_ptr<PassManagerFunc>        m_pass_manager_func;
+        std::unique_ptr<boost::thread>          m_pass_manager_thread;
 
         void print_tile_renderers_stats() const
         {

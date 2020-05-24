@@ -30,13 +30,14 @@
 #include "zip.h"
 
 // appleseed.foundation headers.
+#include "foundation/string/string.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/minizip/unzip.h"
 #include "foundation/utility/minizip/zip.h"
-#include "foundation/utility/string.h"
 
 // Boost headers.
 #include "boost/filesystem.hpp"
+#include "boost/range/iterator_range.hpp"
 
 // Standard headers.
 #include <ctime>
@@ -44,7 +45,6 @@
 #include <set>
 #include <vector>
 
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace foundation
@@ -61,7 +61,7 @@ ZipException::ZipException(const char* what)
 
 ZipException::ZipException(const char* what, const int err)
 {
-    const string string_what = string(what) + " (error code: " + to_string(err) + ")";
+    const std::string string_what = std::string(what) + " (error code: " + to_string(err) + ")";
     set_what(string_what.c_str());
 }
 
@@ -72,7 +72,7 @@ ZipException::ZipException(const char* what, const int err)
 
 namespace
 {
-    bool is_zip_entry_directory(const string& dirname)
+    bool is_zip_entry_directory(const std::string& dirname)
     {
         // Use our own implementation of is_zip_entry_directory instead of Boost's one
         // because this directory is not in the filesystem but in the zip file.
@@ -111,12 +111,12 @@ namespace
             throw ZipException("crc error");
     }
 
-    string read_filename(unzFile& zip_file)
+    std::string read_filename(unzFile& zip_file)
     {
         unz_file_info zip_file_info;
         unzGetCurrentFileInfo(zip_file, &zip_file_info, nullptr, 0, nullptr, 0, nullptr, 0);
 
-        vector<char> filename(zip_file_info.size_filename + 1);
+        std::vector<char> filename(zip_file_info.size_filename + 1);
         unzGetCurrentFileInfo(
             zip_file,
             &zip_file_info,
@@ -126,25 +126,25 @@ namespace
             nullptr, 0);
         filename[filename.size() - 1] = '\0';
 
-        return string(&filename[0]);
+        return std::string(&filename[0]);
     }
 
-    string get_filepath(unzFile& zip_file, const string& unzipped_dir)
+    std::string get_filepath(unzFile& zip_file, const std::string& unzipped_dir)
     {
-        const string filename = read_filename(zip_file);
+        const std::string filename = read_filename(zip_file);
         return (bf::path(unzipped_dir) / bf::path(filename)).string();
     }
 
-    void create_subdirectories(const string& filepath)
+    void create_subdirectories(const std::string& filepath)
     {
         const bf::path parent_path = bf::path(filepath).parent_path();
         if (!bf::exists(parent_path))
             bf::create_directories(parent_path);
     }
 
-    void extract_current_file(unzFile& zip_file, const string& unzipped_dir)
+    void extract_current_file(unzFile& zip_file, const std::string& unzipped_dir)
     {
-        const string filepath = get_filepath(zip_file, unzipped_dir);
+        const std::string filepath = get_filepath(zip_file, unzipped_dir);
 
         if (is_zip_entry_directory(filepath))
             return;
@@ -152,7 +152,7 @@ namespace
         create_subdirectories(filepath);
         open_current_file(zip_file);
 
-        fstream out(filepath.c_str(), ios_base::out | ios_base::binary);
+        std::fstream out(filepath.c_str(), std::ios_base::out | std::ios_base::binary);
         if (out.fail())
             throw ZipException(("can't open file " + filepath).c_str());
 
@@ -190,7 +190,7 @@ namespace
             throw ZipException("error while writing to zip", err);
     }
 
-    void open_new_file_in_zip(zipFile& zip_file, string filename_in_zip, zip_fileinfo zip_file_info)
+    void open_new_file_in_zip(zipFile& zip_file, std::string filename_in_zip, zip_fileinfo zip_file_info)
     {
         const int err =
             zipOpenNewFileInZip(
@@ -205,7 +205,7 @@ namespace
             throw ZipException(("error while opening " + filename_in_zip + " in zipfile").c_str());
     }
 
-    zip_fileinfo make_zip_fileinfo(const string& filename)
+    zip_fileinfo make_zip_fileinfo(const std::string& filename)
     {
         time_t timestamp = bf::last_write_time(filename);
         tm* timestamp_components = localtime(&timestamp);
@@ -225,15 +225,15 @@ namespace
         return zip_file_info;
     }
 
-    void zip_current_file(zipFile& zip_file, const string& filename, const string& base_directory)
+    void zip_current_file(zipFile& zip_file, const std::string& filename, const std::string& base_directory)
     {
-        const string filename_in_fs = (bf::path(base_directory) / filename).string();
+        const std::string filename_in_fs = (bf::path(base_directory) / filename).string();
 
         const zip_fileinfo zip_file_info = make_zip_fileinfo(filename_in_fs);
 
         open_new_file_in_zip(zip_file, filename, zip_file_info);
 
-        fstream in(filename_in_fs.c_str(), ios_base::in | ios_base::binary);
+        std::fstream in(filename_in_fs.c_str(), std::ios_base::in | std::ios_base::binary);
         if (in.fail())
             throw ZipException(("can't open file " + filename_in_fs).c_str());
 
@@ -252,7 +252,7 @@ namespace
     }
 }
 
-void unzip(const string& zip_filename, const string& unzipped_dir)
+void unzip(const std::string& zip_filename, const std::string& unzipped_dir)
 {
     try
     {
@@ -273,33 +273,29 @@ void unzip(const string& zip_filename, const string& unzipped_dir)
 
         unzClose(zip_file);
     }
-    catch (const exception& e)
+    catch (const std::exception& e)
     {
         bf::remove_all(unzipped_dir);
         throw e;
     }
 }
 
-void zip(const string& zip_filename, const string& directory_to_zip)
+void zip(const std::string& zip_filename, const std::string& directory_to_zip)
 {
     try
     {
-        set<string> files_to_zip = recursive_ls(directory_to_zip);
+        std::set<std::string> files_to_zip = recursive_ls(directory_to_zip);
 
         zipFile zip_file = zipOpen(zip_filename.c_str(), 0);
         if (zip_file == nullptr)
             throw ZipException(("can't open file " + zip_filename).c_str());
 
-        for (set<string>::iterator it = files_to_zip.begin();
-             it != files_to_zip.end(); ++it)
-        {
-            const string filename_to_zip = *it;
+        for (const std::string& filename_to_zip : files_to_zip)
             zip_current_file(zip_file, filename_to_zip, directory_to_zip);
-        }
 
         zipClose(zip_file, nullptr);
     }
-    catch (const exception& e)
+    catch (const std::exception& e)
     {
         bf::remove(zip_filename);
         throw e;
@@ -319,9 +315,9 @@ bool is_zip_file(const char* filename)
     }
 }
 
-vector<string> get_filenames_with_extension_from_zip(const string& zip_filename, const string& extension)
+std::vector<std::string> get_filenames_with_extension_from_zip(const std::string& zip_filename, const std::string& extension)
 {
-    vector<string> filenames;
+    std::vector<std::string> filenames;
 
     unzFile zip_file = unzOpen(zip_filename.c_str());
     if (zip_file == nullptr)
@@ -332,7 +328,7 @@ vector<string> get_filenames_with_extension_from_zip(const string& zip_filename,
     int has_next = UNZ_OK;
     while (has_next == UNZ_OK)
     {
-        const string filename = read_filename(zip_file);
+        const std::string filename = read_filename(zip_file);
 
         if (ends_with(filename, extension))
             filenames.push_back(filename);
@@ -345,25 +341,20 @@ vector<string> get_filenames_with_extension_from_zip(const string& zip_filename,
     return filenames;
 }
 
-set<string> recursive_ls(const bf::path& dir)
+std::set<std::string> recursive_ls(const bf::path& dir)
 {
-    set<string> files;
+    std::set<std::string> files;
 
-    // A default-constructed directory_iterator acts as the end iterator.
-    for (bf::directory_iterator di(dir), de; di != de; ++di)
+    for (const bf::path& entry_path : boost::make_iterator_range(bf::directory_iterator(dir)))
     {
-        const bf::path& current_path = di->path();
-
-        if (bf::is_directory(current_path))
+        if (bf::is_directory(entry_path))
         {
-            const string dirname = current_path.filename().string();
-            const set<string> files_in_subdir = recursive_ls(current_path);
+            const std::string dirname = entry_path.filename().string();
 
-            for (const_each<set<string>> fi = files_in_subdir; fi; ++fi)
-                files.insert(dirname + "/" + *fi);
+            for (const std::string& filepath : recursive_ls(entry_path))
+                files.insert(dirname + "/" + filepath);
         }
-        else
-            files.insert(current_path.filename().string());
+        else files.insert(entry_path.filename().string());
     }
 
     return files;

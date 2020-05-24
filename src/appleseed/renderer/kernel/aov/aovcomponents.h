@@ -34,6 +34,12 @@
 // appleseed.foundation headers.
 #include "foundation/image/color.h"
 
+// OSL headers.
+#include "OSL/accum.h"
+
+// standard headers.
+#include <vector>
+
 namespace renderer
 {
 
@@ -47,6 +53,9 @@ class AOVComponents
 
     // Constructor. Clears all components to 0.
     AOVComponents();
+
+    // Return true if all components are finite (not NaN, not infinite) and non-negative.
+    bool is_valid() const;
 };
 
 }   // namespace renderer

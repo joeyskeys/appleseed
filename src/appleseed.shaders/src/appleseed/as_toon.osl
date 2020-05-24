@@ -44,7 +44,7 @@ shader as_toon
 [[
     string help = "Non-Photo-Realistic (NPR) Toon material node",
     string icon = "asToon.png",
-    string URL = "https://appleseed.readthedocs.io/projects/appleseed-maya/en/latest/shaders/material/as_toon.html#label-as-toon",
+    string URL = "https://appleseed.readthedocs.io/projects/appleseed-maya/en/latest/shaders/material/as_toon.html",
 
     string as_node_name = "asToon",
     string as_category = "shader",
@@ -857,11 +857,9 @@ shader as_toon
             // controlled via BRDF,BTDF weights in i.e, glass BSDF.
 
             out_outColor += in_specular_weight * as_glossy(
-                "beckmann",
                 specularN,
                 tangent,
                 in_specular_roughness,
-                0.0, // specular spread for Student t-MDF
                 in_anisotropy_amount,
                 in_ior);
         }

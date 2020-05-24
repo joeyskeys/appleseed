@@ -47,7 +47,6 @@
 #include "foundation/image/tile.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // OSL headers.
 #include "foundation/platform/_beginoslheaders.h"

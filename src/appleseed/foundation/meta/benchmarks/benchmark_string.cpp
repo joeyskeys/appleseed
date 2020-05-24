@@ -28,16 +28,15 @@
 //
 
 // appleseed.foundation headers.
+#include "foundation/string/string.h"
 #include "foundation/utility/benchmark.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <cstdlib>
 
 using namespace foundation;
-using namespace std;
 
-BENCHMARK_SUITE(Foundation_Utility_String)
+BENCHMARK_SUITE(Foundation_String_String)
 {
     template <typename T>
     struct Fixture

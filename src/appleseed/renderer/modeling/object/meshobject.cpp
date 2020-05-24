@@ -37,9 +37,9 @@
 #include "renderer/modeling/object/triangle.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/api/apiarray.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/foreach.h"
 
 // Standard headers.
@@ -48,7 +48,6 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -65,7 +64,7 @@ namespace
 struct MeshObject::Impl
 {
     StaticTriangleTess          m_tess;
-    vector<string>              m_material_slots;
+    std::vector<std::string>    m_material_slots;
 };
 
 MeshObject::MeshObject(
@@ -109,7 +108,7 @@ const StaticTriangleTess& MeshObject::get_static_triangle_tess() const
 
 void MeshObject::rasterize(ObjectRasterizer& rasterizer) const
 {
-    rasterizer.begin_object();
+    rasterizer.begin_object(impl->m_tess.m_primitives.size());
 
     for (const auto& prim : impl->m_tess.m_primitives)
     {

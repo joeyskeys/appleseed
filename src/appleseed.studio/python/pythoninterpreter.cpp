@@ -33,7 +33,7 @@
 #include "mainwindow/mainwindow.h"
 #include "mainwindow/pythonconsole/outputredirector.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 
 // appleseed.renderer headers.
@@ -42,14 +42,13 @@
 // appleseed.foundation headers.
 #include "foundation/core/exceptions/exception.h"
 #include "foundation/platform/path.h"
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 // Boost headers.
 #include "boost/filesystem.hpp"
 
-using namespace appleseed::shared;
+using namespace appleseed::common;
 using namespace foundation;
-using namespace std;
 namespace bpy = boost::python;
 namespace bf = boost::filesystem;
 
@@ -107,7 +106,7 @@ namespace
         // Compute full path.
         const bf::path site_pkg_path = base_path / "lib" / "python" / "site-packages";
 
-        return safe_canonical(site_pkg_path);
+        return safe_weakly_canonical(site_pkg_path);
     }
 
     bf::path compute_appleseed_python_module_path()
@@ -133,7 +132,7 @@ namespace
         // Compute full path.
         lib_path = base_path / lib_path / "python";
 
-        return safe_canonical(lib_path);
+        return safe_weakly_canonical(lib_path);
     }
 
     bf::path compute_bundled_plugins_path()
@@ -154,7 +153,7 @@ namespace
         // Compute full path.
         bf::path plugins_path = base_path / "studio" / "plugins";
 
-        return safe_canonical(plugins_path);
+        return safe_weakly_canonical(plugins_path);
     }
 }
 
@@ -244,13 +243,13 @@ void PythonInterpreter::load_plugins()
             compute_bundled_plugins_path().string()));
 }
 
-bpy::object PythonInterpreter::execute(const string& command, const bool notify)
+bpy::object PythonInterpreter::execute(const std::string& command, const bool notify)
 {
     bpy::object result;
 
     try
     {
-        const string escaped_command = replace(command, "\\", "\\\\");
+        const std::string escaped_command = replace(command, "\\", "\\\\");
         result = bpy::exec(escaped_command.c_str(), m_main_namespace, m_main_namespace);
     }
     catch (const bpy::error_already_set&)

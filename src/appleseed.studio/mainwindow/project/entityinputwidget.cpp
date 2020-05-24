@@ -31,12 +31,14 @@
 
 // appleseed.studio headers.
 #include "mainwindow/project/tools.h"
-#include "utility/doubleslider.h"
+
+// appleseed.qtcommon headers.
 #include "utility/interop.h"
-#include "utility/mousewheelfocuseventfilter.h"
+#include "widgets/doubleslider.h"
+#include "widgets/mousewheelfocuseventfilter.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 // Qt headers.
 #include <QHBoxLayout>
@@ -49,8 +51,8 @@
 // Standard headers.
 #include <string>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -147,12 +149,12 @@ EntityInputProxy::EntityInputProxy(EntityInputWidget* input_widget)
     connect(input_widget, SIGNAL(signal_changed()), SIGNAL(signal_changed()));
 }
 
-void EntityInputProxy::set(const string& value)
+void EntityInputProxy::set(const std::string& value)
 {
     m_input_widget->set_value(QString::fromStdString(value));
 }
 
-string EntityInputProxy::get() const
+std::string EntityInputProxy::get() const
 {
     return m_input_widget->get_value().toStdString();
 }
@@ -278,12 +280,12 @@ ColorMapInputProxy::ColorMapInputProxy(ColorMapInputWidget* input_widget)
     connect(input_widget, SIGNAL(signal_changed()), SIGNAL(signal_changed()));
 }
 
-void ColorMapInputProxy::set(const string& value)
+void ColorMapInputProxy::set(const std::string& value)
 {
     m_input_widget->set_value(QString::fromStdString(value));
 }
 
-string ColorMapInputProxy::get() const
+std::string ColorMapInputProxy::get() const
 {
     return m_input_widget->get_value().toStdString();
 }

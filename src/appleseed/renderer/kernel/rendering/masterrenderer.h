@@ -54,20 +54,18 @@ class APPLESEED_DLLSYMBOL MasterRenderer
   : public foundation::NonCopyable
 {
   public:
-    // Constructor.
+    // Constructor taking a tile callback factory.
     MasterRenderer(
         Project&                        project,
         const ParamArray&               params,
         const foundation::SearchPaths&  resource_search_paths,
-        IRendererController*            renderer_controller,
         ITileCallbackFactory*           tile_callback_factory = nullptr);
 
-    // Constructor for serial tile callbacks.
+    // Constructor taking a single tile callback (calls to it will be serialized).
     MasterRenderer(
         Project&                        project,
         const ParamArray&               params,
         const foundation::SearchPaths&  resource_search_paths,
-        IRendererController*            renderer_controller,
         ITileCallback*                  tile_callback);
 
     // Destructor.
@@ -81,15 +79,13 @@ class APPLESEED_DLLSYMBOL MasterRenderer
     {
         enum Status { Succeeded, Aborted, Failed };
 
-        Status  m_status;
-        double  m_render_time;
-        double  m_post_processing_time;
+        Status m_status;
 
         RenderingResult();
     };
 
     // Render the project.
-    RenderingResult render();
+    RenderingResult render(IRendererController& renderer_controller);
 
   private:
     struct Impl;

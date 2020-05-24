@@ -36,16 +36,14 @@
 #include "foundation/image/color.h"
 #include "foundation/math/fp.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
+#include "foundation/memory/memory.h"
 #include "foundation/utility/bufferedfile.h"
-#include "foundation/utility/memory.h"
 #include "foundation/utility/otherwise.h"
 
 // Standard headers.
+#include <cstdint>
 #include <cstring>
 #include <memory>
-
-using namespace std;
 
 namespace foundation
 {
@@ -54,7 +52,7 @@ namespace foundation
 // MitsHairFileReader class implementation.
 //
 
-MitsHairFileReader::MitsHairFileReader(const string& filename, const float radius, const size_t degree)
+MitsHairFileReader::MitsHairFileReader(const std::string& filename, const float radius, const size_t degree)
   : m_filename(filename)
   , m_radius(radius)
   , m_degree(degree)
@@ -73,7 +71,7 @@ void MitsHairFileReader::read(ICurveBuilder& builder)
 
     read_and_check_signature(file);
 
-    unique_ptr<ReaderAdapter> reader;
+    std::unique_ptr<ReaderAdapter> reader;
     reader.reset(new PassthroughReaderAdapter(file));
     read_curves(*reader.get(), builder);
 }
@@ -94,7 +92,7 @@ void MitsHairFileReader::read_curves(ReaderAdapter& reader, ICurveBuilder& build
     try
     {
         // Read the basis and curve count
-        uint32 vertex_count;
+        std::uint32_t vertex_count;
         try
         {
             checked_read(reader, vertex_count);
@@ -107,9 +105,9 @@ void MitsHairFileReader::read_curves(ReaderAdapter& reader, ICurveBuilder& build
         builder.begin_curve_object(static_cast<CurveBasis>(m_degree));
         builder.begin_curve();
 
-        vector<Vector3f> vertices, new_vertices;
+        std::vector<Vector3f> vertices, new_vertices;
 
-        for (uint32 c = 0; c < vertex_count; ++c)
+        for (std::uint32_t c = 0; c < vertex_count; ++c)
         {
             float x;
             checked_read(reader, x);

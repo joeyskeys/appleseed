@@ -46,14 +46,14 @@
 #include "renderer/api/utility.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/core/appleseed.h"
+#include "foundation/log/consolelogtarget.h"
 #include "foundation/math/matrix.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
-#include "foundation/utility/containers/dictionary.h"
-#include "foundation/utility/log/consolelogtarget.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/searchpaths.h"
 
 // Standard headers.
@@ -282,7 +282,7 @@ int main()
 {
     // Create a log target that outputs to stderr, and binds it to the renderer's global logger.
     // Eventually you will probably want to redirect log messages to your own target. For this
-    // you will need to implement foundation::ILogTarget (foundation/utility/log/ilogtarget.h).
+    // you will need to implement foundation::ILogTarget (foundation/log/ilogtarget.h).
     std::unique_ptr<asf::ILogTarget> log_target(asf::create_console_log_target(stderr));
     asr::global_logger().add_target(log_target.get());
 
@@ -299,11 +299,10 @@ int main()
         new asr::MasterRenderer(
             project.ref(),
             project->configurations().get_by_name("final")->get_inherited_parameters(),
-            resource_search_paths,
-            &renderer_controller));
+            resource_search_paths));
 
     // Render the frame.
-    renderer->render();
+    renderer->render(renderer_controller);
 
     // Save the frame to disk.
     project->get_frame()->write_main_image("output/test.png");

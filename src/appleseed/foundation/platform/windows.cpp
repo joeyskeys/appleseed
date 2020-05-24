@@ -34,16 +34,12 @@
 // Windows headers.
 #include <crtdbg.h>
 
-using namespace std;
-
 namespace foundation
 {
 
 void disable_all_windows_abort_dialogs()
 {
-    //
     // See comments at https://stackoverflow.com/q/53907689/393756 for explanations.
-    //
 
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
 
@@ -56,38 +52,9 @@ void disable_all_windows_abort_dialogs()
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 }
 
-string get_windows_last_error_message()
+bool does_windows_support_utf8_code_page()
 {
-    //
-    // Relevant articles:
-    //
-    //   http://coolcowstudio.wordpress.com/2012/10/19/getlasterror-as-stdstring/
-    //   http://blogs.msdn.com/b/oldnewthing/archive/2007/11/28/6564257.aspx
-    //
-
-    LPVOID buf;
-
-    const DWORD buf_len =
-        FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER              // allocate the output buffer
-                | FORMAT_MESSAGE_FROM_SYSTEM            // the message number is a system error code
-                | FORMAT_MESSAGE_IGNORE_INSERTS,        // don't process %1... placeholders
-            0,                                          // format string (unused)
-            GetLastError(),                             // error code
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),  // use default language
-            reinterpret_cast<LPTSTR>(&buf),             // output buffer
-            0,                                          // size of the output buffer in TCHARs (unused)
-            0);                                         // argument list (unused)
-
-    if (buf_len == 0)
-        return "FormatMessageA() call failed.";
-
-    LPCSTR msg = reinterpret_cast<LPCSTR>(buf);
-    const string result(msg, msg + buf_len);
-
-    LocalFree(buf);
-
-    return result;
+    return GetACP() == 65001;
 }
 
 }   // namespace foundation

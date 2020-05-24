@@ -58,7 +58,6 @@
 #include <cassert>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -93,7 +92,7 @@ AOVoxelTree::AOVoxelTree(
     tree_stats.print(global_logger());
 }
 
-void AOVoxelTree::dump_solid_leaves_to_disk(const string& filename) const
+void AOVoxelTree::dump_solid_leaves_to_disk(const std::string& filename) const
 {
     RENDERER_LOG_INFO(
         "writing ambient occlusion voxel tree file %s...",
@@ -113,7 +112,7 @@ void AOVoxelTree::dump_solid_leaves_to_disk(const string& filename) const
     }
 }
 
-void AOVoxelTree::dump_tree_to_disk(const string& filename) const
+void AOVoxelTree::dump_tree_to_disk(const std::string& filename) const
 {
     RENDERER_LOG_INFO(
         "writing ambient occlusion voxel tree file %s...",
@@ -180,7 +179,7 @@ void AOVoxelTree::build(
     BuilderType&    builder)
 {
     // The voxel tree is built using the scene geometry at the middle of the shutter interval.
-    const float time = scene.get_active_camera()->get_shutter_middle_time();
+    const float time = scene.get_render_data().m_active_camera->get_shutter_middle_time();
 
     // Loop over the assembly instances of the scene.
     for (const_each<AssemblyInstanceContainer> i = scene.assembly_instances(); i; ++i)
@@ -338,7 +337,7 @@ double compute_fast_ambient_occlusion(
         if (intersector.trace(ray, true, distance))
         {
             ++occluded_samples;
-            min_distance = min(min_distance, distance);
+            min_distance = std::min(min_distance, distance);
         }
     }
 

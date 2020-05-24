@@ -48,7 +48,7 @@
 #include "renderer/api/volume.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/foreach.h"
 
 // Standard headers.
@@ -56,7 +56,6 @@
 
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -97,11 +96,10 @@ namespace
 //
 
 EntityBrowser<Project>::EntityBrowser(const Project& project)
-  : m_project(project)
 {
 }
 
-StringDictionary EntityBrowser<Project>::get_entities(const string& type) const
+StringDictionary EntityBrowser<Project>::get_entities(const std::string& type) const
 {
     return StringDictionary();
 }
@@ -116,7 +114,7 @@ EntityBrowser<BaseGroup>::EntityBrowser(const BaseGroup& base_group)
 {
 }
 
-StringDictionary EntityBrowser<BaseGroup>::get_entities(const string& type) const
+StringDictionary EntityBrowser<BaseGroup>::get_entities(const std::string& type) const
 {
     return
         type == "color" ? build_entity_dictionary(m_base_group.colors()) :
@@ -135,7 +133,7 @@ EntityBrowser<Scene>::EntityBrowser(const Scene& scene)
 {
 }
 
-StringDictionary EntityBrowser<Scene>::get_entities(const string& type) const
+StringDictionary EntityBrowser<Scene>::get_entities(const std::string& type) const
 {
     return
         type == "camera" ? build_entity_dictionary(m_scene.cameras()) :
@@ -155,7 +153,7 @@ EntityBrowser<Assembly>::EntityBrowser(const Assembly& assembly)
 {
 }
 
-StringDictionary EntityBrowser<Assembly>::get_entities(const string& type) const
+StringDictionary EntityBrowser<Assembly>::get_entities(const std::string& type) const
 {
     StringDictionary entities =
         type == "bsdf" ? build_entity_dictionary(m_assembly.bsdfs()) :
@@ -196,7 +194,7 @@ EntityBrowser<Frame>::EntityBrowser(const Frame& frame)
 {
 }
 
-StringDictionary EntityBrowser<Frame>::get_entities(const string& type) const
+StringDictionary EntityBrowser<Frame>::get_entities(const std::string& type) const
 {
     return
         type == "aov" ? build_entity_dictionary(m_frame.aovs()) :

@@ -50,16 +50,15 @@
 #include "foundation/math/qmc.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/statistics.h"
 
 // Standard headers.
 #include <cassert>
+#include <cstdint>
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -145,7 +144,7 @@ namespace
 
         const FilterSamplingTable&          m_filter_sampling_table;
 
-        Population<uint64>                  m_total_sampling_dim;
+        Population<std::uint64_t>           m_total_sampling_dim;
 
         AOVAccumulatorContainer             m_aov_accumulators;
 
@@ -214,7 +213,6 @@ namespace
             // Create a single sample.
             Sample sample;
             sample.m_pixel_coords = pixel_context.get_pixel_coords();
-            sample.m_position = Vector2f(sample_position);
             sample.m_color = shading_result.m_main;
             samples.push_back(sample);
 

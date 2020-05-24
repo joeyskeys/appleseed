@@ -32,20 +32,30 @@
 # Packages.
 #--------------------------------------------------------------------------------------------------
 
-if (NOT PYTHON_MAJOR_VERSION STREQUAL "2")
-    message (FATAL_ERROR "Python 2.x needed")
-endif ()
+set (BOOST_NEEDED_LIBS)
 
-if (Boost_VERSION_STRING VERSION_GREATER_EQUAL 1.67)
-    find_package (Boost 1.61 COMPONENTS python27 python35)
-else ()
-    find_package (Boost 1.61 COMPONENTS python python3)
+# Don't use Boost_VERSION directly as it changed format with Boost 1.70.
+
+if (WITH_PYTHON2_BINDINGS)
+    if ((Boost_MAJOR_VERSION GREATER 1) OR (Boost_MINOR_VERSION GREATER_EQUAL 67))
+        set (BOOST_NEEDED_LIBS ${BOOST_NEEDED_LIBS} python27)
+    else ()
+        set (BOOST_NEEDED_LIBS ${BOOST_NEEDED_LIBS} python)
+    endif ()
 endif ()
 
 if (WITH_PYTHON3_BINDINGS)
     find_package (Python3 REQUIRED)
     find_package (OpenGL REQUIRED)
+
+    if ((Boost_MAJOR_VERSION GREATER 1) OR (Boost_MINOR_VERSION GREATER_EQUAL 67))
+        set (BOOST_NEEDED_LIBS ${BOOST_NEEDED_LIBS} python37)
+    else ()
+        set (BOOST_NEEDED_LIBS ${BOOST_NEEDED_LIBS} python3)
+    endif ()
 endif ()
+
+find_package (Boost 1.61 REQUIRED COMPONENTS ${BOOST_NEEDED_LIBS})
 
 
 #--------------------------------------------------------------------------------------------------
@@ -117,7 +127,7 @@ list (APPEND appleseed.python_sources
     ${sources}
 )
 set (blender_python_sources
-    bindblendermeshconverter.cpp
+    bindblenderexport.cpp
     bindblenderprogressivetilecallback.cpp
 )
 source_group ("" FILES
@@ -130,21 +140,28 @@ source_group ("" FILES
 # Targets.
 #--------------------------------------------------------------------------------------------------
 
-add_library (appleseed.python MODULE
-    ${appleseed.python_sources}
-)
-
-set_target_properties (appleseed.python PROPERTIES FOLDER "Python Bindings")
-
-set_target_properties (appleseed.python PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME "_appleseedpython"
-)
-
-if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    set_target_properties (appleseed.python PROPERTIES
-        SUFFIX ".pyd"
+if (WITH_PYTHON2_BINDINGS)
+    add_library (appleseed.py2.obj OBJECT
+        ${appleseed.python_sources}
     )
+
+    add_library (appleseed.python MODULE
+        $<TARGET_OBJECTS:appleseed.py2.obj>
+    )
+
+    set_target_properties (appleseed.py2.obj PROPERTIES FOLDER "Python Bindings")
+    set_target_properties (appleseed.python PROPERTIES FOLDER "Python Bindings")
+
+    set_target_properties (appleseed.python PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "_appleseedpython"
+    )
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        set_target_properties (appleseed.python PROPERTIES
+            SUFFIX ".pyd"
+        )
+    endif ()
 endif ()
 
 if (WITH_PYTHON3_BINDINGS)
@@ -178,10 +195,12 @@ endif ()
 
 include_directories (
     .
-    ../appleseed.shared
+    ../appleseed.common
 )
 
-target_include_directories (appleseed.python PRIVATE ${PYTHON_INCLUDE_DIRS})
+if (WITH_PYTHON2_BINDINGS)
+    target_include_directories (appleseed.py2.obj PRIVATE ${PYTHON_INCLUDE_DIRS})
+endif ()
 
 if (WITH_PYTHON3_BINDINGS)
     target_include_directories (appleseed.python3 PRIVATE ${PYTHON3_INCLUDE_DIRS})
@@ -192,11 +211,13 @@ endif ()
 # Preprocessor definitions.
 #--------------------------------------------------------------------------------------------------
 
-apply_preprocessor_definitions (appleseed.python)
+if (WITH_PYTHON2_BINDINGS)
+    apply_preprocessor_definitions (appleseed.py2.obj)
 
-append_custom_preprocessor_definitions (appleseed.python
-    APPLESEED_ENABLE_IMATH_INTEROP
-)
+    append_custom_preprocessor_definitions (appleseed.py2.obj
+        APPLESEED_ENABLE_IMATH_INTEROP
+    )
+endif ()
 
 if (WITH_PYTHON3_BINDINGS)
     apply_preprocessor_definitions (appleseed.python3)
@@ -211,27 +232,43 @@ endif ()
 # Static libraries.
 #--------------------------------------------------------------------------------------------------
 
-link_against_platform (appleseed.python)
-link_against_ocio (appleseed.python)
-link_against_oiio (appleseed.python)
+if (WITH_PYTHON2_BINDINGS)
+    link_against_platform (appleseed.python)
 
-target_link_libraries (appleseed.python
-    appleseed
-    ${Boost_PYTHON_LIBRARY}             # all Boost libraries but Boost.Python3
-    ${PYTHON_LIBRARIES}
-)
+    target_link_libraries (appleseed.python
+        appleseed
+        ${Boost_PYTHON_LIBRARY}         # Only Boost.Python2 library
+    )
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        target_link_libraries (appleseed.python
+            ${PYTHON_LIBRARIES}
+        )
+    endif ()
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set_target_properties (appleseed.python PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+    endif ()
+endif ()
 
 if (WITH_PYTHON3_BINDINGS)
     link_against_platform (appleseed.python3)
-    link_against_ocio (appleseed.python3)
-    link_against_oiio (appleseed.python3)
 
     target_link_libraries (appleseed.python3
         appleseed
-        ${Boost_PYTHON3_LIBRARY}        # all Boost libraries but Boost.Python
         glad
-        ${PYTHON3_LIBRARY}
+        ${Boost_PYTHON3_LIBRARY}        # Only Boost.Python3 library
     )
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+        target_link_libraries (appleseed.python3
+            ${PYTHON3_LIBRARY}
+        )
+    endif ()
+
+    if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        set_target_properties (appleseed.python3 PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")
+    endif ()
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_libraries (appleseed.python3
@@ -253,11 +290,14 @@ add_custom_target (
 set_target_properties (appleseed.python.copy_py_files PROPERTIES FOLDER "Contents")
 set_target_progress_message (appleseed.python.copy_py_files "Copying appleseed.python Python files...")
 
-add_copy_target_to_sandbox_py_module_command (appleseed.python appleseed)
 add_copy_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.python/__init__.py appleseed)
 add_copy_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.python/logtarget.py appleseed)
 add_copy_py_file_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.python/textureconverter.py appleseed)
 add_copy_dir_to_sandbox_py_module_command (${PROJECT_SOURCE_DIR}/src/appleseed.python/test appleseed)
+
+if (WITH_PYTHON2_BINDINGS)
+    add_copy_target_to_sandbox_py_module_command (appleseed.python appleseed)
+endif ()
 
 if (WITH_PYTHON3_BINDINGS)
     add_copy_target_to_sandbox_py_module_command (appleseed.python3 appleseed)
@@ -273,7 +313,10 @@ set (py_module_dst "lib/python${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION}/ap
 install (FILES __init__.py DESTINATION ${py_module_dst})
 install (FILES logtarget.py DESTINATION ${py_module_dst})
 install (DIRECTORY test DESTINATION ${py_module_dst})
-install (TARGETS appleseed.python DESTINATION ${py_module_dst})
+
+if (WITH_PYTHON2_BINDINGS)
+    install (TARGETS appleseed.python DESTINATION ${py_module_dst})
+endif()
 
 if (WITH_PYTHON3_BINDINGS)
     install (TARGETS appleseed.python3 DESTINATION ${py_module_dst})

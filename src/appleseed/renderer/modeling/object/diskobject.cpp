@@ -30,21 +30,21 @@
 #include "diskobject.h"
 
 // appleseed.renderer headers.
+#include "renderer/kernel/intersection/refining.h"
 #include "renderer/kernel/shading/shadingray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/intersection/raydisk.h"
 #include "foundation/math/ray.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/job/iabortswitch.h"
 #include "foundation/utility/searchpaths.h"
-#include "foundation/utility/string.h"
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -118,6 +118,23 @@ double DiskObject::get_uncached_radius() const
     return m_params.get_optional<double>("radius", 1.0);
 }
 
+Vector3d DiskObject::get_uncached_center() const
+{
+    return Vector3d(0.0, 0.0, 0.0);
+}
+
+void DiskObject::get_axes(
+    Vector3d&              x,
+    Vector3d&              y,
+    Vector3d&              n) const
+{
+    const double radius = get_uncached_radius();
+
+    x = Vector3d(radius, 0.0, 0.0);
+    y = Vector3d(0.0, 0.0, radius);
+    n = Vector3d(0.0, 1.0, 0.0);
+}
+
 void DiskObject::intersect(
     const ShadingRay&      ray,
     IntersectionResult&    result) const
@@ -149,6 +166,37 @@ bool DiskObject::intersect(const ShadingRay& ray) const
     return intersect_disk(
         ray,
         impl->m_radius);
+}
+
+void DiskObject::refine_and_offset(
+    const Ray3d&        obj_inst_ray,
+    Vector3d&           obj_inst_front_point,
+    Vector3d&           obj_inst_back_point,
+    Vector3d&           obj_inst_geo_normal) const
+{
+    const auto intersection_handling = [](const Vector3d& p, const Vector3d& dir)
+    {
+        assert(is_normalized(dir));
+        return -p.y / dir.y;
+    };
+
+    const Vector3d refined_intersection_point =
+        refine(
+            obj_inst_ray.m_org,
+            obj_inst_ray.m_dir,
+            intersection_handling);
+
+    obj_inst_geo_normal =
+        obj_inst_ray.m_dir.y < 0.0
+            ? Vector3d(0.0, 1.0, 0.0)
+            : Vector3d(0.0, -1.0, 0.0);
+
+    adaptive_offset(
+        refined_intersection_point,
+        obj_inst_geo_normal,
+        obj_inst_front_point,
+        obj_inst_back_point,
+        intersection_handling);
 }
 
 

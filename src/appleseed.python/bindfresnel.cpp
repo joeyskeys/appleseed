@@ -29,42 +29,39 @@
 // appleseed.foundation headers.
 #include "foundation/math/fresnel.h"
 #include "foundation/platform/python.h"
-#include "foundation/platform/types.h"
 
 namespace bpy = boost::python;
 using namespace foundation;
 
 namespace
 {
+    bpy::tuple af_conductor_reparam(
+        const double r,
+        const double g)
+    {
+        double n, k;
+        artist_friendly_fresnel_conductor_reparameterization(
+            r,
+            g,
+            n,
+            k);
 
-bpy::tuple af_conductor_reparam(
-    const double r,
-    const double g)
-{
-    double n, k;
-    artist_friendly_fresnel_conductor_reparameterization(
-        r,
-        g,
-        n,
-        k);
+        return bpy::make_tuple(n, k);
+    }
 
-    return bpy::make_tuple(n, k);
-}
+    bpy::tuple af_conductor_inverse_reparam(
+        const double n,
+        const double k)
+    {
+        double r, g;
+        artist_friendly_fresnel_conductor_inverse_reparameterization(
+            n,
+            k,
+            r,
+            g);
 
-bpy::tuple af_conductor_inverse_reparam(
-    const double n,
-    const double k)
-{
-    double r, g;
-    artist_friendly_fresnel_conductor_inverse_reparameterization(
-        n,
-        k,
-        r,
-        g);
-
-    return bpy::make_tuple(r, g);
-}
-
+        return bpy::make_tuple(r, g);
+    }
 }
 
 void bind_fresnel()

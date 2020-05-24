@@ -30,19 +30,19 @@
 #include "foundation/array/algorithm.h"
 
 // Standard headers.
+#include <cstdint>
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Array_Algorithm)
 {
     TEST_CASE(CopyIndexed)
     {
         Array src(ArrayType::UInt32Type);
-        ArrayRef<uint32> src_ref(src);
+        ArrayRef<std::uint32_t> src_ref(src);
 
-        const uint32 items[] = {1, 2, 3, 4, 5, 6, 7};
+        const std::uint32_t items[] = {1, 2, 3, 4, 5, 6, 7};
         src_ref.assign(items, items + countof(items));
 
         const size_t indices[] = {6, 2, 3, 1, 1, 4, 3, 1, 2};
@@ -53,7 +53,7 @@ TEST_SUITE(Foundation_Array_Algorithm)
 
         EXPECT_EQ(dst.size(), countof(indices));
 
-        const ArrayView<uint32> dst_ref(dst);
+        const ArrayView<std::uint32_t> dst_ref(dst);
 
         for (size_t i = 0, e = countof(indices); i < e; ++i)
         {
@@ -67,68 +67,68 @@ TEST_SUITE(Foundation_Array_Algorithm)
     TEST_CASE(ConvertToSmallestType16to8)
     {
         Array src(ArrayType::UInt16Type);
-        ArrayRef<uint16> src_ref(src);
-        const uint32 items[] = {1, 2, 132, 4, 255, 6, 77};
+        ArrayRef<std::uint16_t> src_ref(src);
+        const std::uint32_t items[] = {1, 2, 132, 4, 255, 6, 77};
         src_ref.assign(items, items + countof(items));
 
         Array array(src);
         convert_to_smallest_type(array);
         EXPECT_EQ(array.type(), ArrayType::UInt8Type);
 
-        const ArrayView<uint16> src_view(src);
-        const ArrayView<uint8> dst_view(array);
+        const ArrayView<std::uint16_t> src_view(src);
+        const ArrayView<std::uint8_t> dst_view(array);
 
-        EXPECT_TRUE(equal(src_view.begin(), src_view.end(), dst_view.begin()));
+        EXPECT_TRUE(std::equal(src_view.begin(), src_view.end(), dst_view.begin()));
     }
 
     TEST_CASE(ConvertToSmallestType32to8)
     {
         Array src(ArrayType::UInt32Type);
-        ArrayRef<uint32> src_ref(src);
-        const uint32 items[] = {1, 2, 132, 4, 255, 6, 77};
+        ArrayRef<std::uint32_t> src_ref(src);
+        const std::uint32_t items[] = {1, 2, 132, 4, 255, 6, 77};
         src_ref.assign(items, items + countof(items));
 
         Array array(src);
         convert_to_smallest_type(array);
         EXPECT_EQ(array.type(), ArrayType::UInt8Type);
 
-        const ArrayView<uint32> src_view(src);
-        const ArrayView<uint8> dst_view(array);
+        const ArrayView<std::uint32_t> src_view(src);
+        const ArrayView<std::uint8_t> dst_view(array);
 
-        EXPECT_TRUE(equal(src_view.begin(), src_view.end(), dst_view.begin()));
+        EXPECT_TRUE(std::equal(src_view.begin(), src_view.end(), dst_view.begin()));
     }
 
     TEST_CASE(ConvertToSmallestType32to16)
     {
         Array src(ArrayType::UInt32Type);
-        ArrayRef<uint32> src_ref(src);
-        const uint32 items[] = {1, 2156, 132, 4, 65535, 6, 77};
+        ArrayRef<std::uint32_t> src_ref(src);
+        const std::uint32_t items[] = {1, 2156, 132, 4, 65535, 6, 77};
         src_ref.assign(items, items + countof(items));
 
         Array array(src);
         convert_to_smallest_type(array);
         EXPECT_EQ(array.type(), ArrayType::UInt16Type);
 
-        const ArrayView<uint32> src_view(src);
-        const ArrayView<uint16> dst_view(array);
+        const ArrayView<std::uint32_t> src_view(src);
+        const ArrayView<std::uint16_t> dst_view(array);
 
-        EXPECT_TRUE(equal(src_view.begin(), src_view.end(), dst_view.begin()));
+        EXPECT_TRUE(std::equal(src_view.begin(), src_view.end(), dst_view.begin()));
     }
 
     TEST_CASE(ConvertToSmallestType32NoOp)
     {
         Array src(ArrayType::UInt32Type);
-        ArrayRef<uint32> src_ref(src);
-        const uint32 items[] = {1, 2156, 132, 4, 65537, 6, 77};
+        ArrayRef<std::uint32_t> src_ref(src);
+        const std::uint32_t items[] = {1, 2156, 132, 4, 65537, 6, 77};
         src_ref.assign(items, items + countof(items));
 
         Array array(src);
         convert_to_smallest_type(array);
         EXPECT_EQ(array.type(), ArrayType::UInt32Type);
 
-        const ArrayView<uint32> src_view(src);
-        const ArrayView<uint32> dst_view(array);
+        const ArrayView<std::uint32_t> src_view(src);
+        const ArrayView<std::uint32_t> dst_view(array);
 
-        EXPECT_TRUE(equal(src_view.begin(), src_view.end(), dst_view.begin()));
+        EXPECT_TRUE(std::equal(src_view.begin(), src_view.end(), dst_view.begin()));
     }
 }

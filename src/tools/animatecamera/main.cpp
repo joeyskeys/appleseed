@@ -31,7 +31,7 @@
 #include "animationpath.h"
 #include "commandlinehandler.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 #include "application/superlogger.h"
 
@@ -48,10 +48,10 @@
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
 #include "foundation/platform/types.h"
-#include "foundation/utility/autoreleaseptr.h"
-#include "foundation/utility/containers/dictionary.h"
-#include "foundation/utility/log.h"
-#include "foundation/utility/string.h"
+#include "foundation/memory/autoreleaseptr.h"
+#include "foundation/containers/dictionary.h"
+#include "foundation/log/log.h"
+#include "foundation/string/string.h"
 
 // Boost headers.
 #include "boost/filesystem/path.hpp"
@@ -69,10 +69,9 @@
 #include <vector>
 
 using namespace appleseed::animatecamera;
-using namespace appleseed::shared;
+using namespace appleseed::common;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace
@@ -123,7 +122,7 @@ namespace
     template <typename T>
     struct TransformPairComparer
     {
-        typedef pair<Transform<T>, Transform<T>> TransformPair;
+        typedef std::pair<Transform<T>, Transform<T>> TransformPair;
 
         bool operator()(const TransformPair& lhs, const TransformPair& rhs) const
         {
@@ -145,8 +144,8 @@ namespace
     {
       public:
         AnimationGenerator(
-            const string&   base_output_filename,
-            Logger&         logger)
+            const std::string&   base_output_filename,
+            Logger&              logger)
           : m_base_output_filename(base_output_filename)
           , m_logger(logger)
         {
@@ -156,7 +155,7 @@ namespace
 
         void generate()
         {
-            const vector<size_t> frames = do_generate();
+            const std::vector<size_t> frames = do_generate();
 
             LOG_INFO(
                 m_logger,
@@ -171,22 +170,22 @@ namespace
         }
 
       protected:
-        const string        m_base_output_filename;
+        const std::string   m_base_output_filename;
         Logger&             m_logger;
 
-        virtual vector<size_t> do_generate() = 0;
+        virtual std::vector<size_t> do_generate() = 0;
 
-        static string make_numbered_filename(
-            const string&   filename,
-            const size_t    number,
-            const size_t    digits = 4)
+        static std::string make_numbered_filename(
+            const std::string&   filename,
+            const size_t         number,
+            const size_t         digits = 4)
         {
             const bf::path path(filename);
 
-            stringstream sstr;
+            std::stringstream sstr;
             sstr << path.stem().string();
             sstr << '.';
-            sstr << setw(digits) << setfill('0') << number;
+            sstr << std::setw(digits) << std::setfill('0') << number;
             sstr << path.extension().string();
 
             return sstr.str();
@@ -202,9 +201,8 @@ namespace
 
             // Read the master project file.
             const char* project_filepath = g_cl.m_filenames.values()[0].c_str();
-            ProjectFileReader reader;
             auto_release_ptr<Project> project(
-                reader.read(
+                ProjectFileReader::read(
                     project_filepath,
                     schema_filepath.string().c_str()));
 
@@ -216,15 +214,15 @@ namespace
         }
 
       private:
-        void generate_windows_render_script(const vector<size_t>& frames) const
+        void generate_windows_render_script(const std::vector<size_t>& frames) const
         {
             const size_t part_count = g_cl.m_part_count.value();
             const size_t frames_per_part =
-                static_cast<size_t>(ceil(static_cast<double>(frames.size()) / part_count));
+                static_cast<size_t>(std::ceil(static_cast<double>(frames.size()) / part_count));
 
             for (size_t part = 1, frame_begin = 0; frame_begin < frames.size(); ++part)
             {
-                const size_t frame_end = min(frame_begin + frames_per_part, frames.size());
+                const size_t frame_end = std::min(frame_begin + frames_per_part, frames.size());
 
                 generate_windows_render_script(
                     frames,
@@ -237,14 +235,14 @@ namespace
         }
 
         void generate_windows_render_script(
-            const vector<size_t>&   frames,
-            const size_t            part,
-            const size_t            frame_begin,
-            const size_t            frame_end) const
+            const std::vector<size_t>&   frames,
+            const size_t                 part,
+            const size_t                 frame_begin,
+            const size_t                 frame_end) const
         {
-            const string RenderScriptBaseFileName = "render.bat";
+            const std::string RenderScriptBaseFileName = "render.bat";
 
-            const string script_filename =
+            const std::string script_filename =
                 frame_begin == 0 && frame_end == frames.size()
                     ? RenderScriptBaseFileName
                     : make_numbered_filename(RenderScriptBaseFileName, part);
@@ -283,16 +281,16 @@ namespace
                 ")\n"
                 "\n");
 
-            const string output_format = g_cl.m_output_format.value();
+            const std::string output_format = g_cl.m_output_format.value();
 
             for (size_t i = frame_begin; i < frame_end; ++i)
             {
                 const size_t current_frame = i + 1;
                 const size_t actual_frame = frames[i];
 
-                const string project_filename = make_numbered_filename(m_base_output_filename + ".appleseed", current_frame);
-                const string image_filename = make_numbered_filename(m_base_output_filename + "." + output_format, current_frame);
-                const string image_filepath = "%output_path%\\" + image_filename;
+                const std::string project_filename = make_numbered_filename(m_base_output_filename + ".appleseed", current_frame);
+                const std::string image_filename = make_numbered_filename(m_base_output_filename + "." + output_format, current_frame);
+                const std::string image_filepath = "%output_path%\\" + image_filename;
 
                 fprintf(script_file, "if exist \"%s\" (\n", image_filepath.c_str());
                 fprintf(script_file, "    echo Skipping %s because it was already rendered...\n", project_filename.c_str());
@@ -312,8 +310,8 @@ namespace
                 }
                 else
                 {
-                    const string source_image_filename = make_numbered_filename(m_base_output_filename + "." + output_format, actual_frame);
-                    const string source_image_filepath = "%output_path%\\" + source_image_filename;
+                    const std::string source_image_filename = make_numbered_filename(m_base_output_filename + "." + output_format, actual_frame);
+                    const std::string source_image_filepath = "%output_path%\\" + source_image_filename;
 
                     fprintf(
                         script_file,
@@ -352,19 +350,19 @@ namespace
     {
       public:
         PathAnimationGenerator(
-            const string&   base_output_filename,
-            Logger&         logger)
+            const std::string&   base_output_filename,
+            Logger&              logger)
           : AnimationGenerator(base_output_filename, logger)
         {
         }
 
       private:
-        vector<size_t> do_generate() override
+        std::vector<size_t> do_generate() override
         {
-            typedef pair<Transformd, Transformd> TransformPair;
-            typedef map<TransformPair, size_t, TransformPairComparer<double>> TransformMap;
+            typedef std::pair<Transformd, Transformd> TransformPair;
+            typedef std::map<TransformPair, size_t, TransformPairComparer<double>> TransformMap;
 
-            vector<size_t> frames;
+            std::vector<size_t> frames;
 
             // Load the animation path file from disk.
             AnimationPath animation_path(m_logger);
@@ -422,7 +420,7 @@ namespace
                 camera->get_parameters().insert("shutter_close_end_time", motion_blur_amount);
 
                 // Write the project file for this frame.
-                const string new_path = make_numbered_filename(m_base_output_filename + ".appleseed", frame);
+                const std::string new_path = make_numbered_filename(m_base_output_filename + ".appleseed", frame);
                 ProjectFileWriter::write(
                     project.ref(),
                     new_path.c_str(),
@@ -448,16 +446,16 @@ namespace
     {
       public:
         TurntableAnimationGenerator(
-            const string&   base_output_filename,
-            Logger&         logger)
+            const std::string&   base_output_filename,
+            Logger&              logger)
           : AnimationGenerator(base_output_filename, logger)
         {
         }
 
       private:
-        vector<size_t> do_generate() override
+        std::vector<size_t> do_generate() override
         {
-            vector<size_t> frames;
+            std::vector<size_t> frames;
 
             // Retrieve the command line parameter values.
             const int frame_count = g_cl.m_frame_count.value();
@@ -478,7 +476,7 @@ namespace
             // Retrieve the scene's bounding box.
             const AABB3d scene_bbox(project->get_scene()->compute_bbox());
             const Vector3d extent = scene_bbox.extent();
-            const double max_radius = 0.5 * max(extent.x, extent.z);
+            const double max_radius = 0.5 * std::max(extent.x, extent.z);
             const double max_height = 0.5 * extent.y;
 
             // Precompute some stuff.
@@ -489,7 +487,7 @@ namespace
 
             // Compute the transform of the camera at the last frame.
             const double angle = -1.0 / frame_count * TwoPi<double>();
-            const Vector3d position(distance * cos(angle), elevation, distance * sin(angle));
+            const Vector3d position(distance * std::cos(angle), elevation, distance * std::sin(angle));
             Transformd previous_transform(
                 Transformd::from_local_to_parent(
                     Matrix4d::make_lookat(position, center, Up)));
@@ -498,7 +496,7 @@ namespace
             {
                 // Compute the transform of the camera at this frame.
                 const double angle = (i * TwoPi<double>()) / frame_count;
-                const Vector3d position(distance * cos(angle), elevation, distance * sin(angle));
+                const Vector3d position(distance * std::cos(angle), elevation, distance * std::sin(angle));
                 const Transformd new_transform(
                     Transformd::from_local_to_parent(
                         Matrix4d::make_lookat(position, center, Up)));
@@ -516,7 +514,7 @@ namespace
 
                 // Write the project file for this frame.
                 const size_t frame = static_cast<size_t>(i + 1);
-                const string new_path = make_numbered_filename(m_base_output_filename + ".appleseed", frame);
+                const std::string new_path = make_numbered_filename(m_base_output_filename + ".appleseed", frame);
                 ProjectFileWriter::write(
                     project.ref(),
                     new_path.c_str(),
@@ -566,10 +564,10 @@ int main(int argc, char* argv[])
     // target of the global logger.
     global_logger().initialize_from(logger);
 
-    const string base_output_filename =
+    const std::string base_output_filename =
         bf::path(g_cl.m_filenames.values()[1]).stem().string();
 
-    unique_ptr<AnimationGenerator> generator;
+    std::unique_ptr<AnimationGenerator> generator;
 
     if (g_cl.m_animation_path.is_set())
         generator.reset(new PathAnimationGenerator(base_output_filename, logger));

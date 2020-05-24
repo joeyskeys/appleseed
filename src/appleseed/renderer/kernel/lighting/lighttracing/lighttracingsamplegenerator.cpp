@@ -65,25 +65,25 @@
 #include "renderer/utility/transformsequence.h"
 
 // appleseed.foundation headers.
+#include "foundation/hash/hash.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/color.h"
 #include "foundation/image/image.h"
 #include "foundation/math/basis.h"
-#include "foundation/math/hash.h"
 #include "foundation/math/population.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/arena.h"
+#include "foundation/memory/arena.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/job/iabortswitch.h"
 #include "foundation/utility/statistics.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 // Forward declarations.
@@ -279,13 +279,13 @@ namespace
         {
             const Parameters&               m_params;
             const Camera&                   m_camera;
-            const Frame&                    m_frame;
+            const size_t                    m_canvas_width;
+            const size_t                    m_canvas_height;
             const ShadingContext&           m_shading_context;
             SamplingContext&                m_sampling_context;
-
-            const Spectrum                  m_initial_flux;         // initial particle flux (in W)
             SampleVector&                   m_samples;
             size_t                          m_sample_count;         // the number of samples added to m_samples
+            const Spectrum                  m_initial_flux;         // initial particle flux (in W)
 
             PathVisitor(
                 const Parameters&           params,
@@ -296,8 +296,9 @@ namespace
                 SampleVector&               samples,
                 const Spectrum&             initial_flux)
               : m_params(params)
-              , m_camera(*scene.get_active_camera())
-              , m_frame(frame)
+              , m_camera(*scene.get_render_data().m_active_camera)
+              , m_canvas_width(frame.image().properties().m_canvas_width)
+              , m_canvas_height(frame.image().properties().m_canvas_height)
               , m_shading_context(shading_context)
               , m_sampling_context(sampling_context)
               , m_samples(samples)
@@ -306,7 +307,9 @@ namespace
             {
             }
 
-            void on_first_diffuse_bounce(const PathVertex& vertex)
+            void on_first_diffuse_bounce(
+                const PathVertex&           vertex,
+                const Spectrum&             albedo)
             {
             }
 
@@ -475,14 +478,17 @@ namespace
                         vertex.get_shading_normal());
 
                 // Evaluate the BSDF at the vertex position.
+                BSDF::LocalGeometry local_geometry;
+                local_geometry.m_shading_point = vertex.m_shading_point;
+                local_geometry.m_geometric_normal = Vector3f(geometric_normal);
+                local_geometry.m_shading_basis = Basis3f(vertex.get_shading_basis());
                 DirectShadingComponents bsdf_value;
                 const float bsdf_prob =
                     vertex.m_bsdf->evaluate(
                         vertex.m_bsdf_data,
                         true,                                       // adjoint
                         true,                                       // multiply by |cos(incoming, normal)|
-                        Vector3f(geometric_normal),
-                        Basis3f(vertex.get_shading_basis()),
+                        local_geometry,
                         Vector3f(vertex.m_outgoing.get_value()),    // outgoing (toward the light)
                         -Vector3f(camera_outgoing),                 // incoming (toward the camera)
                         ScatteringMode::All,                        // todo: likely incorrect
@@ -518,9 +524,10 @@ namespace
                 const Color3f linear_rgb = radiance.to_rgb(g_std_lighting_conditions);
 
                 Sample sample;
-                sample.m_pixel_coords = m_frame.get_pixel_position(position_ndc);
-                sample.m_position = Vector2f(position_ndc);
-                sample.m_color = Color4f(linear_rgb, 1.0f);
+                sample.m_pixel_coords.x = static_cast<int>(position_ndc.x * m_canvas_width);
+                sample.m_pixel_coords.y = static_cast<int>(position_ndc.y * m_canvas_height);
+                sample.m_color.rgb() = linear_rgb;
+                sample.m_color.a = 1.0f;
                 m_samples.push_back(sample);
 
                 ++m_sample_count;
@@ -550,10 +557,10 @@ namespace
 
         SamplingContext::RNGType        m_rng;
 
-        uint64                          m_light_sample_count;
+        std::uint64_t                   m_light_sample_count;
 
-        uint64                          m_path_count;
-        Population<uint64>              m_path_length;
+        std::uint64_t                   m_path_count;
+        Population<std::uint64_t>       m_path_length;
 
         float                           m_shutter_open_begin_time;
         float                           m_shutter_close_end_time;
@@ -565,7 +572,7 @@ namespace
             m_arena.clear();
 
             // Create a sampling context.
-            const size_t instance = mix_uint32(m_frame.get_noise_seed(), static_cast<uint32>(sequence_index));
+            const size_t instance = mix_uint32(m_frame.get_noise_seed(), static_cast<std::uint32_t>(sequence_index));
             SamplingContext sampling_context(
                 m_rng,
                 m_params.m_sampling_mode,
@@ -626,7 +633,7 @@ namespace
                     light_sample.m_geometric_normal,
                     light_sample.m_shading_normal);
 
-            const Material* material = light_sample.m_shape->m_material;
+            const Material* material = light_sample.m_shape->get_material();
             const Material::RenderData& material_data = material->get_render_data();
 
             // Build a shading point on the light source.

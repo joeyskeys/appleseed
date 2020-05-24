@@ -29,9 +29,10 @@
 #pragma once
 
 // appleseed.foundation headers.
+#include "foundation/array/arrayallocator.h"
 #include "foundation/array/arraytraits.h"
+#include "foundation/memory/alignedallocator.h"
 #include "foundation/platform/compiler.h"
-#include "foundation/utility/alignedallocator.h"
 #include "foundation/utility/test.h"
 
 // appleseed.main headers.
@@ -54,6 +55,9 @@ namespace foundation
 class APPLESEED_DLLSYMBOL Array
 {
   public:
+    // Constructor
+    Array();
+
     // Constructor.
     explicit Array(const ArrayType type, const size_t size = 0);
 
@@ -61,16 +65,16 @@ class APPLESEED_DLLSYMBOL Array
     ~Array();
 
     // Copy constructor
-    Array(const Array& other);
+    Array(const Array& rhs);
 
     // Move constructor.
-    Array(Array&& other) APPLESEED_NOEXCEPT;
+    Array(Array&& rhs) APPLESEED_NOEXCEPT;
 
     // Assignment.
-    Array& operator=(const Array& other);
+    Array& operator=(const Array& rhs);
 
     // Move assignment.
-    Array& operator=(Array&& other) APPLESEED_NOEXCEPT;
+    Array& operator=(Array&& rhs) APPLESEED_NOEXCEPT;
 
     // Return the type of the array elements.
     ArrayType type() const;
@@ -80,6 +84,9 @@ class APPLESEED_DLLSYMBOL Array
 
     // Return the number of items in the array.
     size_t size() const;
+
+    // Return the size in bytes of an item in the array.
+    size_t item_size() const;
 
     // Return the capacity of the array.
     size_t capacity() const;
@@ -92,6 +99,10 @@ class APPLESEED_DLLSYMBOL Array
 
     // Resize the array to n items.
     void resize(const size_t n);
+
+    // Return a pointer to the elements.
+    const void* data() const;
+    void* data();
 
     // Remove excess capacity from the array.
     void shrink_to_fit();
@@ -121,7 +132,7 @@ class APPLESEED_DLLSYMBOL Array
 
     struct Concept
     {
-        virtual ~Concept();
+        virtual ~Concept() = default;
         virtual Concept* copy() const = 0;
 
         virtual ArrayType type() const = 0;
@@ -153,104 +164,44 @@ class APPLESEED_DLLSYMBOL Array
     struct Model
       : public Concept
     {
-        Model()
-        {
-        }
+        Model() = default;
 
-        Model(const Model& other)
-          : m_items(other.m_items)
-        {
-        }
+        Model(const Model& rhs) = default;
 
-        Concept* copy() const override
-        {
-            return new Model(*this);
-        }
+        Concept* copy() const override;
 
-        ArrayType type() const override
-        {
-            return ArrayTraits<T>::array_type();
-        }
+        ArrayType type() const override;
 
-        size_t item_size() const override
-        {
-            return sizeof(T);
-        }
+        size_t item_size() const override;
 
-        bool empty() const override
-        {
-            return m_items.empty();
-        }
+        bool empty() const override;
 
-        size_t size() const override
-        {
-            return m_items.size();
-        }
+        size_t size() const override;
 
-        size_t capacity() const override
-        {
-            return m_items.capacity();
-        }
+        size_t capacity() const override;
 
-        void clear() override
-        {
-            m_items.clear();
-        }
+        void clear() override;
 
-        void reserve(const size_t n) override
-        {
-            m_items.reserve(n);
-        }
+        void reserve(const size_t n) override;
 
-        void resize(const size_t n) override
-        {
-            m_items.resize(n);
-        }
+        void resize(const size_t n) override;
 
-        void shrink_to_fit() override
-        {
-            m_items.shrink_to_fit();
-        }
+        void shrink_to_fit() override;
 
-        void push_back(const void* p) override
-        {
-            m_items.push_back(*reinterpret_cast<const T*>(p));
-        }
+        void push_back(const void* p) override;
 
-        const void* begin() const override
-        {
-            return m_items.data();
-        }
+        const void* begin() const override;
+        const void* end() const override;
 
-        const void* end() const override
-        {
-            return
-                reinterpret_cast<const int8*>(m_items.data())
-                + sizeof(T) * m_items.size();
-        }
+        void* begin() override;
+        void* end() override;
 
-        void* begin() override
-        {
-            return m_items.data();
-        }
+        bool equals(const Concept* rhs) const override;
 
-        void* end() override
-        {
-            return
-                reinterpret_cast<int8*>(m_items.data())
-                + sizeof(T) * m_items.size();
-        }
-
-        bool equals(const Concept* rhs) const override
-        {
-            const Model* m = reinterpret_cast<const Model*>(rhs);
-            return m_items == m->m_items;
-        }
-
-        std::vector<T, AlignedAllocator<T>> m_items;
+        std::vector<T, ArrayAllocator<T>> m_items;
     };
 
     Concept* m_self;
 };
 
-}       // namespace foundation
+}   // namespace foundation

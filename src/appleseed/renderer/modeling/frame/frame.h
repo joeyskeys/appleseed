@@ -39,8 +39,7 @@
 #include "foundation/image/colorspace.h"
 #include "foundation/math/aabb.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/uid.h"
 
 // appleseed.main headers.
@@ -49,6 +48,7 @@
 // Standard headers.
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 
 // Forward declarations.
 namespace foundation    { class DictionaryArray; }
@@ -132,14 +132,12 @@ class APPLESEED_DLLSYMBOL Frame
     const foundation::AABB2u& get_crop_window() const;
 
     // Get the noise seed.
-    foundation::uint32 get_noise_seed() const;
+    std::uint32_t get_noise_seed() const;
 
     // Expose asset file paths referenced by this entity to the outside.
     void collect_asset_paths(foundation::StringArray& paths) const override;
     void update_asset_paths(const foundation::StringDictionary& mappings) override;
 
-    // This method is called once before rendering each frame.
-    // Returns true on success, false otherwise.
     bool on_frame_begin(
         const Project&                                  project,
         const BaseGroup*                                parent,
@@ -162,9 +160,6 @@ class APPLESEED_DLLSYMBOL Frame
         const size_t                                    pixel_y,            // y coordinate of the pixel in the tile
         const double                                    sample_x,           // x coordinate of the sample in the pixel, in [0,1)
         const double                                    sample_y) const;    // y coordinate of the sample in the pixel, in [0,1)
-
-    // Return the image space coordinates of a given point in NDC coordinates.
-    foundation::Vector2i get_pixel_position(const foundation::Vector2d& ndc) const;
 
     // Do any post-process needed by AOV images.
     void post_process_aov_images() const;
@@ -189,14 +184,16 @@ class APPLESEED_DLLSYMBOL Frame
         const size_t                                thread_count,
         foundation::IAbortSwitch*                   abort_switch) const;
 
-    // Open the checkpoint if the chekpoint resume option is enabled.
+    // Load a checkpoint file from disk if checkpoint resuming is enabled.
     // Returns true if successful, false otherwise.
-    bool load_checkpoint(IShadingResultFrameBufferFactory*  buffer_factory);
+    bool load_checkpoint(
+        IShadingResultFrameBufferFactory*           buffer_factory,
+        const size_t                                pass_count);        // total number of passes to render
 
-    // Create a checkpoint file for the resuming the render at the current pass.
+    // Save a checkpoint file to disk if checkpoint creation is enabled.
     void save_checkpoint(
         IShadingResultFrameBufferFactory*           buffer_factory,
-        const size_t                                pass) const;
+        const size_t                                pass_index) const;  // index of the pass to be written
 
     // Write the main image to disk.
     // Return true if successful, false otherwise.
@@ -324,13 +321,6 @@ inline foundation::Vector2d Frame::get_sample_position(
             tile_y * m_props.m_tile_height + pixel_y,
             sample_x,
             sample_y);
-}
-
-inline foundation::Vector2i Frame::get_pixel_position(const foundation::Vector2d& ndc) const
-{
-    return foundation::Vector2i(
-        static_cast<int>((ndc.x * m_props.m_canvas_width) + 0.5),
-        static_cast<int>((ndc.y * m_props.m_canvas_height) + 0.5));
 }
 
 }   // namespace renderer

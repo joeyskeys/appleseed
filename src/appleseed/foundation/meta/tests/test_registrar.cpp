@@ -29,12 +29,11 @@
 
 // appleseed.foundation headers.
 #include "foundation/core/concepts/iunknown.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/registrar.h"
 #include "foundation/utility/test.h"
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Utility_Registrar)
 {

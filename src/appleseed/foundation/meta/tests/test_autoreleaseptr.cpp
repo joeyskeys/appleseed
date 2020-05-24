@@ -29,8 +29,8 @@
 
 // appleseed.foundation headers.
 #include "foundation/core/concepts/iunknown.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/platform/compiler.h"
-#include "foundation/utility/autoreleaseptr.h"
 #include "foundation/utility/test.h"
 
 using namespace foundation;
@@ -173,5 +173,14 @@ TEST_SUITE(Foundation_Utility_AutoReleasePtr)
         ptr.reset(nullptr);
 
         EXPECT_TRUE(release_was_called);
+    }
+
+    TEST_CASE(ImplicitConversionToBool)
+    {
+        auto_release_ptr<Derived> ptr(new Derived());
+
+        const bool value = ptr ? true : false;
+
+        EXPECT_TRUE(value);
     }
 }

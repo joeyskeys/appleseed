@@ -33,8 +33,8 @@
 #include "renderer/modeling/entity/connectableentity.h"
 
 // appleseed.foundation headers.
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/platform/compiler.h"
-#include "foundation/utility/autoreleaseptr.h"
 #include "foundation/utility/uid.h"
 
 // appleseed.main headers.
@@ -121,21 +121,27 @@ class APPLESEED_DLLSYMBOL Material
     // Return true if the material emits light.
     virtual bool has_emission() const;
 
-    // This method is called once before rendering each frame.
-    // Returns true on success, false otherwise.
     bool on_frame_begin(
         const Project&              project,
         const BaseGroup*            parent,
         OnFrameBeginRecorder&       recorder,
         foundation::IAbortSwitch*   abort_switch = nullptr) override;
 
-    // This method is called once after rendering each frame (only if on_frame_begin() was called).
     void on_frame_end(
         const Project&              project,
         const BaseGroup*            parent) override;
 
-    struct RenderData
+    struct APPLESEED_DLLSYMBOL RenderData
     {
+        enum class DefaultTangentMode
+        {
+            UV,
+            LocalX,
+            LocalY,
+            LocalZ,
+            Radial
+        };
+
         const SurfaceShader*        m_surface_shader;
         const BSDF*                 m_bsdf;
         const BSSRDF*               m_bssrdf;
@@ -143,7 +149,12 @@ class APPLESEED_DLLSYMBOL Material
         const Volume*               m_volume;
         const Source*               m_alpha_map;
         const ShaderGroup*          m_shader_group;
-        const IBasisModifier*       m_basis_modifier;   // owned by RenderData
+        const IBasisModifier*       m_basis_modifier;           // owned by RenderData
+        DefaultTangentMode          m_default_tangent_mode;
+
+        RenderData();
+
+        void clear();
     };
 
     // Return render-time data of this entity.
@@ -151,8 +162,7 @@ class APPLESEED_DLLSYMBOL Material
     const RenderData& get_render_data() const;
 
   protected:
-    bool        m_has_render_data;
-    RenderData  m_render_data;
+    RenderData m_render_data;
 
     // Constructor.
     Material(
@@ -162,6 +172,9 @@ class APPLESEED_DLLSYMBOL Material
     const char* get_non_empty(const ParamArray& params, const char* name) const;
 
     IBasisModifier* create_basis_modifier(const MessageContext& context) const;
+
+  private:
+    RenderData::DefaultTangentMode get_default_tangent_mode() const;
 };
 
 
@@ -171,7 +184,6 @@ class APPLESEED_DLLSYMBOL Material
 
 inline const Material::RenderData& Material::get_render_data() const
 {
-    assert(m_has_render_data);
     return m_render_data;
 }
 

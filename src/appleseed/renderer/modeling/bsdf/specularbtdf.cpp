@@ -38,20 +38,19 @@
 #include "renderer/modeling/bsdf/bsdfsample.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/fresnel.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
-#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -116,19 +115,21 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
-            assert(is_normalized(sample.m_geometric_normal));
-            assert(is_normalized(sample.m_outgoing.get_value()));
+            assert(is_normalized(local_geometry.m_geometric_normal));
+            assert(is_normalized(outgoing.get_value()));
 
             if (!ScatteringMode::has_specular(modes))
                 return;
 
             const InputValues* values = static_cast<const InputValues*>(data);
 
-            const Vector3f& shading_normal = sample.m_shading_basis.get_normal();
-            const float cos_theta_i = dot(sample.m_outgoing.get_value(), shading_normal);
+            const Vector3f& shading_normal = local_geometry.m_shading_basis.get_normal();
+            const float cos_theta_i = dot(outgoing.get_value(), shading_normal);
             const float sin_theta_i2 = 1.0f - square(cos_theta_i);
             const float sin_theta_t2 = sin_theta_i2 * square(values->m_precomputed.m_eta);
             const float cos_theta_t2 = 1.0f - sin_theta_t2;
@@ -139,7 +140,7 @@ namespace
             if (cos_theta_t2 < 0.0f)
             {
                 // Total internal reflection: compute the reflected direction and radiance.
-                incoming = reflect(sample.m_outgoing.get_value(), shading_normal);
+                incoming = reflect(outgoing.get_value(), shading_normal);
                 sample.m_value.m_glossy = values->m_transmittance;
                 sample.m_value.m_glossy *= values->m_transmittance_multiplier;
                 refract_differentials = false;
@@ -147,12 +148,12 @@ namespace
             else
             {
                 // Compute the Fresnel reflection factor.
-                const float cos_theta_t = sqrt(cos_theta_t2);
+                const float cos_theta_t = std::sqrt(cos_theta_t2);
                 float fresnel_reflection;
                 fresnel_reflectance_dielectric(
                     fresnel_reflection,
                     1.0f / values->m_precomputed.m_eta,
-                    abs(cos_theta_i),
+                    std::abs(cos_theta_i),
                     cos_theta_t);
                 fresnel_reflection *= values->m_fresnel_multiplier;
 
@@ -162,7 +163,7 @@ namespace
                 if (s < fresnel_reflection)
                 {
                     // Fresnel reflection: compute the reflected direction and radiance.
-                    incoming = reflect(sample.m_outgoing.get_value(), shading_normal);
+                    incoming = reflect(outgoing.get_value(), shading_normal);
                     sample.m_value.m_glossy = values->m_reflectance;
                     sample.m_value.m_glossy *= values->m_reflectance_multiplier;
                     refract_differentials = false;
@@ -173,8 +174,8 @@ namespace
                     const float eta = values->m_precomputed.m_eta;
                     incoming =
                         cos_theta_i > 0.0f
-                            ? (eta * cos_theta_i - cos_theta_t) * shading_normal - eta * sample.m_outgoing.get_value()
-                            : (eta * cos_theta_i + cos_theta_t) * shading_normal - eta * sample.m_outgoing.get_value();
+                            ? (eta * cos_theta_i - cos_theta_t) * shading_normal - eta * outgoing.get_value()
+                            : (eta * cos_theta_i + cos_theta_t) * shading_normal - eta * outgoing.get_value();
 
                     // Compute the refracted radiance.
                     sample.m_value.m_glossy = values->m_transmittance;
@@ -187,7 +188,7 @@ namespace
 
             if (!cosine_mult)
             {
-                const float cos_in = abs(dot(incoming, shading_normal));
+                const float cos_in = std::abs(dot(incoming, shading_normal));
                 sample.m_value.m_glossy /= cos_in;
             }
 
@@ -202,16 +203,21 @@ namespace
 
             // Compute the ray differentials.
             if (refract_differentials)
-                sample.compute_transmitted_differentials(values->m_precomputed.m_eta);
-            else sample.compute_reflected_differentials();
+            {
+                sample.compute_specular_transmitted_differentials(
+                    local_geometry,
+                    values->m_precomputed.m_eta,
+                    local_geometry.m_shading_point->is_entering(),
+                    outgoing);
+            }
+            else sample.compute_specular_reflected_differentials(local_geometry, outgoing);
         }
 
         float evaluate(
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -223,8 +229,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override
@@ -258,7 +263,7 @@ namespace
 
                 const float a = 1.0f - (values->m_transmittance[i] * values->m_transmittance_multiplier);
                 const float optical_depth = a * d;
-                absorption[i] = exp(-optical_depth);
+                absorption[i] = std::exp(-optical_depth);
             }
         }
 

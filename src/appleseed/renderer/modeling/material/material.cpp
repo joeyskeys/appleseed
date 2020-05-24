@@ -51,18 +51,39 @@
 
 // appleseed.foundation headers.
 #include "foundation/image/colorspace.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/makevector.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
+
+//
+// Material::RenderData class implementation.
+//
+
+Material::RenderData::RenderData()
+{
+    clear();
+}
+
+void Material::RenderData::clear()
+{
+    m_surface_shader = nullptr;
+    m_bsdf = nullptr;
+    m_bssrdf = nullptr;
+    m_edf = nullptr;
+    m_volume = nullptr;
+    m_alpha_map = nullptr;
+    m_shader_group = nullptr;
+    m_basis_modifier = nullptr;
+}
+
 
 //
 // Material class implementation.
@@ -82,7 +103,6 @@ Material::Material(
     const char*             name,
     const ParamArray&       params)
   : ConnectableEntity(g_class_uid, params)
-  , m_has_render_data(false)
 {
     set_name(name);
 
@@ -176,18 +196,12 @@ bool Material::on_frame_begin(
     if (!ConnectableEntity::on_frame_begin(project, parent, recorder, abort_switch))
         return false;
 
-    assert(!m_has_render_data);
+    m_render_data.clear();
     m_render_data.m_surface_shader = get_uncached_surface_shader();
     if (m_render_data.m_surface_shader == nullptr)
         m_render_data.m_surface_shader = project.get_scene()->get_default_surface_shader();
-    m_render_data.m_bsdf = nullptr;
-    m_render_data.m_bssrdf = nullptr;
-    m_render_data.m_edf = nullptr;
     m_render_data.m_alpha_map = get_uncached_alpha_map();
-    m_render_data.m_shader_group = nullptr;
-    m_render_data.m_basis_modifier = nullptr;
-    m_render_data.m_volume = nullptr;
-    m_has_render_data = true;
+    m_render_data.m_default_tangent_mode = get_default_tangent_mode();
 
     return true;
 }
@@ -196,12 +210,8 @@ void Material::on_frame_end(
     const Project&          project,
     const BaseGroup*        parent)
 {
-    // `m_has_render_data` may be false if `on_frame_begin()` failed.
-    if (m_has_render_data)
-    {
-        delete m_render_data.m_basis_modifier;
-        m_has_render_data = false;
-    }
+    delete m_render_data.m_basis_modifier;
+    m_render_data.clear();
 
     ConnectableEntity::on_frame_end(project, parent);
 }
@@ -249,8 +259,8 @@ IBasisModifier* Material::create_basis_modifier(const MessageContext& context) c
     }
 
     // Retrieve the displacement method.
-    const string displacement_method =
-        m_params.get_required<string>(
+    const std::string displacement_method =
+        m_params.get_required<std::string>(
             "displacement_method",
             "bump",
             make_vector("bump", "normal"),
@@ -266,11 +276,26 @@ IBasisModifier* Material::create_basis_modifier(const MessageContext& context) c
     else
     {
         const NormalMappingModifier::UpVector up_vector =
-            m_params.get_optional<string>("normal_map_up", "z", make_vector("y", "z"), context) == "y"
+            m_params.get_optional<std::string>("normal_map_up", "z", make_vector("y", "z"), context) == "y"
                 ? NormalMappingModifier::UpVectorY
                 : NormalMappingModifier::UpVectorZ;
         return new NormalMappingModifier(displacement_source, up_vector);
     }
+}
+
+Material::RenderData::DefaultTangentMode Material::get_default_tangent_mode() const
+{
+    const std::string default_tangent_mode =
+        m_params.get_optional<std::string>(
+            "default_tangent_mode",
+            "uv",
+            make_vector("uv", "local_x", "local_y", "local_z", "radial"));
+    return
+        default_tangent_mode == "local_x" ? RenderData::DefaultTangentMode::LocalX :
+        default_tangent_mode == "local_y" ? RenderData::DefaultTangentMode::LocalY :
+        default_tangent_mode == "local_z" ? RenderData::DefaultTangentMode::LocalZ :
+        default_tangent_mode == "radial"  ? RenderData::DefaultTangentMode::Radial :
+                                            RenderData::DefaultTangentMode::UV;
 }
 
 }   // namespace renderer

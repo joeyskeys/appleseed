@@ -40,7 +40,7 @@ THISDIR=`pwd`
 echo "travis_fold:start:deps"
 echo "Downloading and unpacking dependencies..."
 
-curl -L "https://github.com/appleseedhq/prebuilt-linux-deps/releases/download/binaries/appleseed-deps-shared-2.0.tgz" > deps.tgz
+curl -L "https://github.com/appleseedhq/linux-deps/releases/download/v2.1.1/appleseed-deps-shared-2.1.1.tgz" > deps.tgz
 tar xfz deps.tgz
 rm deps.tgz
 
@@ -65,7 +65,7 @@ export CMAKE_LIBRARY_PATH=$APPLESEED_DEPENDENCIES/lib
 #--------------------------------------------------------------------------------------------------
 
 export LD_LIBRARY_PATH=$APPLESEED_DEPENDENCIES/lib:$LD_LIBRARY_PATH
-export PYTHONPATH=$PYTHONPATH:sandbox/lib/Debug/python
+export PYTHONPATH=$PYTHONPATH:sandbox/lib/$BUILD_TYPE/python
 
 
 #--------------------------------------------------------------------------------------------------
@@ -80,22 +80,22 @@ pushd build
 
 cmake \
     -Wno-dev \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DUSE_SSE42=ON \
-    -DWITH_DISNEY_MATERIAL=OFF \
+    -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+    -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" \
     -DWITH_EMBREE=ON \
+    -DUSE_SSE42=ON \
     -DUSE_STATIC_BOOST=OFF \
     -DBOOST_INCLUDEDIR=$APPLESEED_DEPENDENCIES/include/boost_1_61_0 \
     -DBOOST_LIBRARYDIR=$APPLESEED_DEPENDENCIES/lib/ \
-    -DBoost_ATOMIC_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_atomic-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_CHRONO_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_chrono-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_DATE_TIME_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_date_time-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_FILESYSTEM_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_filesystem-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_PYTHON_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_python-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_REGEX_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_regex-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_SYSTEM_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_system-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_THREAD_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_thread-gcc48-mt-1_61.so.1.61.0 \
-    -DBoost_WAVE_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_wave-gcc48-mt-1_61.so.1.61.0 \
+    -DBoost_ATOMIC_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_atomic-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_CHRONO_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_chrono-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_DATE_TIME_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_date_time-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_FILESYSTEM_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_filesystem-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_PYTHON_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_python-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_REGEX_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_regex-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_SYSTEM_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_system-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_THREAD_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_thread-gcc63-mt-1_61.so.1.61.0 \
+    -DBoost_WAVE_LIBRARY_DEBUG=$APPLESEED_DEPENDENCIES/lib/libboost_wave-gcc63-mt-1_61.so.1.61.0 \
     -DEMBREE_INCLUDE_DIR=$APPLESEED_DEPENDENCIES/include \
     -DEMBREE_LIBRARY=$APPLESEED_DEPENDENCIES/lib/libembree3.so \
     -DLZ4_INCLUDE_DIR=$APPLESEED_DEPENDENCIES/include \
@@ -124,7 +124,7 @@ echo "travis_fold:end:build"
 echo "travis_fold:start:unit-tests"
 echo "Running appleseed unit tests..."
 
-sandbox/bin/Debug/appleseed.cli --run-unit-tests --verbose-unit-tests
+sandbox/bin/$BUILD_TYPE/appleseed.cli --run-unit-tests --verbose-unit-tests
 
 echo "travis_fold:end:unit-tests"
 
@@ -136,7 +136,7 @@ echo "travis_fold:end:unit-tests"
 echo "travis_fold:start:python-unit-tests"
 echo "Running appleseed.python unit tests..."
 
-python sandbox/lib/Debug/python/appleseed/test/runtests.py
+python sandbox/lib/$BUILD_TYPE/python/appleseed/test/runtests.py
 
 echo "travis_fold:end:python-unit-tests"
 

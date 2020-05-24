@@ -37,7 +37,6 @@
 #include "foundation/core/concepts/noncopyable.h"
 #include "foundation/math/microfacet.h"
 #include "foundation/math/qmc.h"
-#include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 
@@ -48,8 +47,6 @@
 #include <cmath>
 
 using namespace foundation;
-using namespace std;
-
 namespace bf = boost::filesystem;
 
 namespace renderer
@@ -71,6 +68,11 @@ namespace
       : public AlbedoTable2D
     {
       public:
+        explicit MDFAlbedoTable(const float* table)
+          : AlbedoTable2D(table)
+        {
+        }
+
         template <typename MDF>
         explicit MDFAlbedoTable(const MDF& mdf)
         {
@@ -92,11 +94,6 @@ namespace
                 m_avg_table[i] = average_albedo(TableSize, p);
                 p += TableSize;
             }
-        }
-
-        explicit MDFAlbedoTable(const float* table)
-          : AlbedoTable2D(table)
-        {
         }
 
       private:
@@ -129,30 +126,51 @@ namespace
                 return 1.0f;
 
             // Build the outgoing vector.
-            const float sin_theta = sqrt(1.0f - square(cos_theta));
+            const float sin_theta = std::sqrt(1.0f - square(cos_theta));
             const Vector3f wo(sin_theta, cos_theta, 0.0f);
 
             float R = 0.0f;
-            const MDF mdf;
 
             for (size_t i = 0; i < sample_count; ++i)
             {
                 // Generate a uniform sample in [0,1)^3.
                 const size_t Bases[] = { 2 };
                 const Vector2f s = hammersley_sequence<float, 2>(Bases, sample_count, i);
-
-                Vector3f wi;
-                float probability;
-                const float value = MicrofacetBRDFHelper<false>::sample(mdf, s, alpha, wo, wi, probability);
-
-                // Skip samples with very low probability.
-                if (probability < 1.0e-6f)
-                    continue;
-
-                R += value * abs(wi.y) / probability;
+                R += sample<GGXMDF>(s, wo, alpha);
             }
 
-            return min(R / static_cast<float>(sample_count), 1.0f);
+            return std::min(R / static_cast<float>(sample_count), 1.0f);
+        }
+
+        template <typename MDF>
+        static float sample(
+            const Vector2f& s,
+            const Vector3f& wo,
+            const float     alpha)
+        {
+            Vector3f m = MDF::sample(wo, s, alpha);
+
+            const float cos_oh = std::abs(dot(wo, m));
+            const float cos_on = std::abs(wo.y);
+
+            if (cos_on == 0.0f || cos_oh == 0.0f)
+                return 0.0f;
+
+            const Vector3f n(0.0f, 1.0f, 0.0f);
+
+            Vector3f wi = reflect(wo, m);
+
+            if (BSDF::force_above_surface(wi, n))
+                m = normalize(wo + wi);
+
+            const float cos_in = std::abs(wi.y);
+
+            if (cos_in == 0.0f)
+                return 0.0f;
+
+            const float G = MDF::G(wi, wo, m, alpha);
+            const float G1 = MDF::G1(wo, m, alpha);
+            return G / G1;
         }
     };
 
@@ -160,119 +178,48 @@ namespace
       : public NonCopyable
     {
         MDFAlbedoTable m_ggx;
-        MDFAlbedoTable m_beckmann;
 
 #ifdef COMPUTE_ALBEDO_TABLES
         AlbedoTables()
           : m_ggx(GGXMDF())
-          , m_beckmann(BeckmannMDF())
         {
         }
 #else
         AlbedoTables()
           : m_ggx(g_glossy_ggx_albedo_table)
-          , m_beckmann(g_glossy_beckmann_albedo_table)
         {
         }
 #endif
     };
 
     AlbedoTables g_dir_albedo_tables;
-
-    void compute_energy_compensation_term(
-        const MDFAlbedoTable&   table,
-        const float             roughness,
-        const float             cos_in,
-        const float             cos_on,
-        float&                  fms,
-        float&                  eavg)
-    {
-        if (cos_in == 0.0f || cos_on == 0.0f || roughness == 0.0f)
-        {
-            fms = 0.0f;
-            eavg = 1.0f;
-            return;
-        }
-
-        eavg = table.get_average_albedo(roughness);
-        if (eavg == 1.0f)
-        {
-            fms = 0.0f;
-            return;
-        }
-
-        const float eo = table.get_directional_albedo(abs(cos_on), roughness);
-        const float ei = table.get_directional_albedo(abs(cos_in), roughness);
-        fms = ((1.0f - eo) * (1.0f - ei)) / (Pi<float>() * (1.0f - eavg));
-    }
 }
 
-float get_average_albedo(
-    const foundation::GGXMDF&       mdf,
-    const float                     roughness)
+float get_directional_albedo(
+    const float     cos_theta,
+    const float     roughness)
+{
+    return g_dir_albedo_tables.m_ggx.get_directional_albedo(
+        cos_theta,
+        roughness);
+}
+
+float get_average_albedo(const float roughness)
 {
     return g_dir_albedo_tables.m_ggx.get_average_albedo(roughness);
 }
 
-float get_average_albedo(
-    const foundation::BeckmannMDF&  mdf,
-    const float                     roughness)
-{
-    return g_dir_albedo_tables.m_beckmann.get_average_albedo(roughness);
-}
-
-void microfacet_energy_compensation_term(
-    const GGXMDF&       mdf,
-    const float         roughness,
-    const float         cos_in,
-    const float         cos_on,
-    float&              fms,
-    float&              eavg)
-{
-    compute_energy_compensation_term(
-        g_dir_albedo_tables.m_ggx,
-        roughness,
-        cos_in,
-        cos_on,
-        fms,
-        eavg);
-}
-
-void microfacet_energy_compensation_term(
-    const BeckmannMDF&  mdf,
-    const float         roughness,
-    const float         cos_in,
-    const float         cos_on,
-    float&              fms,
-    float&              eavg)
-{
-    compute_energy_compensation_term(
-        g_dir_albedo_tables.m_beckmann,
-        roughness,
-        cos_in,
-        cos_on,
-        fms,
-        eavg);
-}
-
 void write_microfacet_directional_albedo_tables(
-    const char*         directory)
+    const char*     directory)
 {
     const bf::path dir(directory);
 
-    const GGXMDF ggx;
+    const GGXMDF ggx = {};
     const MDFAlbedoTable ggx_table(ggx);
     ggx_table.write_table_to_image(dir / "glossy_ggx_albedo_table.exr");
     ggx_table.write_table_to_cpp_array(
         dir / "glossy_ggx_albedo_table.cpp",
         "g_glossy_ggx_albedo_table");
-
-    const BeckmannMDF beckmann;
-    const MDFAlbedoTable beckmann_table(beckmann);
-    beckmann_table.write_table_to_image(dir / "glossy_beckmann_albedo_table.exr");
-    beckmann_table.write_table_to_cpp_array(
-        dir / "glossy_beckmann_albedo_table.cpp",
-        "g_glossy_beckmann_albedo_table");
 }
 
 }   // namespace renderer

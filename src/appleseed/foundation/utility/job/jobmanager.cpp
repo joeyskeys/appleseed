@@ -31,17 +31,16 @@
 #include "jobmanager.h"
 
 // appleseed.foundation headers.
+#include "foundation/log/log.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/job/jobqueue.h"
 #include "foundation/utility/job/workerthread.h"
-#include "foundation/utility/log.h"
 
 // Standard headers.
 #include <cassert>
 #include <vector>
 
 using namespace boost;
-using namespace std;
 
 namespace foundation
 {
@@ -52,7 +51,7 @@ namespace foundation
 
 struct JobManager::Impl
 {
-    typedef vector<WorkerThread*> WorkerThreads;
+    typedef std::vector<WorkerThread*> WorkerThreads;
 
     Logger&             m_logger;
     JobQueue&           m_job_queue;

@@ -58,7 +58,6 @@
 #include <limits>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -94,13 +93,10 @@ ScenePicker::~ScenePicker()
 ScenePicker::PickingResult ScenePicker::pick(const Vector2d& ndc) const
 {
     PickingResult result;
-
     result.m_ndc = ndc;
-
     result.m_hit = false;
     result.m_primitive_type = ShadingPoint::PrimitiveNone;
-    result.m_distance = numeric_limits<double>::max();
-
+    result.m_distance = std::numeric_limits<double>::max();
     result.m_bary = Vector2f(0.0);
     result.m_uv = Vector2f(0.0);
     result.m_duvdx = Vector2f(0.0);
@@ -114,10 +110,11 @@ ScenePicker::PickingResult ScenePicker::pick(const Vector2d& ndc) const
     result.m_dpdy = Vector3d(0.0);
     result.m_geometric_normal = Vector3d(0.0);
     result.m_original_shading_normal = Vector3d(0.0);
+    result.m_shading_basis.build(Vector3d(0.0, 1.0, 0.0), Vector3d(1.0, 0.0, 0.0));
     result.m_side = ObjectInstance::FrontSide;
-
     result.m_camera = impl->m_project.get_uncached_active_camera();
     result.m_assembly_instance = nullptr;
+    result.m_assembly_instance_transform = Transformd::make_identity();
     result.m_assembly = nullptr;
     result.m_object_instance = nullptr;
     result.m_object = nullptr;
@@ -133,14 +130,10 @@ ScenePicker::PickingResult ScenePicker::pick(const Vector2d& ndc) const
     SamplingContext::RNGType rng;
     SamplingContext sampling_context(rng, SamplingContext::QMCMode);
 
-    const CanvasProperties& frame_props = impl->m_project.get_frame()->image().properties();
-    const Vector2d ndc_dx(1.0 / (4.0 * frame_props.m_canvas_width), 0.0);
-    const Vector2d ndc_dy(0.0, -1.0 / (4.0 * frame_props.m_canvas_height));
-
     ShadingRay ray;
     result.m_camera->spawn_ray(
         sampling_context,
-        Dual2d(ndc, ndc_dx, ndc_dy),
+        Dual2d(ndc),
         ray);
 
     ShadingPoint shading_point;
@@ -167,6 +160,7 @@ ScenePicker::PickingResult ScenePicker::pick(const Vector2d& ndc) const
     result.m_dpdy = shading_point.get_dpdy();
     result.m_geometric_normal = shading_point.get_geometric_normal();
     result.m_original_shading_normal = shading_point.get_original_shading_normal();
+    result.m_shading_basis = shading_point.get_shading_basis();
     result.m_side = shading_point.get_side();
 
     result.m_assembly_instance = &shading_point.get_assembly_instance();

@@ -34,12 +34,13 @@
 #ifdef APPLESEED_USE_SSE
 #include "foundation/platform/sse.h"
 #endif
-#include "foundation/platform/types.h"
 
 // Standard headers.
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #ifdef _MSC_VER
 #include <cstdlib>
 #include <intrin.h>
@@ -53,6 +54,7 @@ namespace foundation
 // Constants.
 //
 
+// Mathematical constants.
 template <typename T> inline T Pi()                 { return static_cast<T>(3.1415926535897932); }
 template <typename T> inline T TwoPi()              { return static_cast<T>(6.2831853071795865); }  // 2 * Pi
 template <typename T> inline T FourPi()             { return static_cast<T>(12.566370614359173); }  // 4 * Pi
@@ -75,6 +77,70 @@ template <typename T> inline T RcpSqrtTwo()         { return static_cast<T>(0.70
 template <typename T> inline T SqrtThree()          { return static_cast<T>(1.7320508075688773); }  // sqrt(3)
 template <typename T> inline T GoldenRatio()        { return static_cast<T>(1.6180339887498948); }  // (1 + sqrt(5)) / 2
 template <typename T> inline T Ln10()               { return static_cast<T>(2.3025850929940457); }  // ln(10)
+
+//
+// The four floating point constants below were determined with the following program:
+//
+//   #include <cmath>
+//   #include <cstdint>
+//   #include <iomanip>
+//   #include <iostream>
+//   #include <limits>
+//
+//   template <typename Target, typename Source>
+//   Target binary_cast(Source s)
+//   {
+//       union { Source m_source; Target m_target; } u;
+//       u.m_source = s;
+//       return u.m_target;
+//   }
+//
+//   template <typename Float, typename UInt>
+//   Float compute_rcp_power_of_two()
+//   {
+//       Float x = std::pow(Float(2.0), std::numeric_limits<UInt>::digits);
+//
+//       while (true)
+//       {
+//           const Float rcp_x = Float(1.0) / x;
+//
+//           if (std::numeric_limits<UInt>::max() * rcp_x < Float(1.0))
+//               return rcp_x;
+//
+//           const UInt x_bits = binary_cast<UInt>(x);
+//           x = binary_cast<Float>(x_bits + 1);
+//       }
+//   }
+//
+//   int main()
+//   {
+//       std::cout << std::setprecision(9) << compute_rcp_power_of_two<float, std::uint32_t>() << std::endl;
+//       std::cout << std::setprecision(17) << compute_rcp_power_of_two<double, std::uint32_t>() << std::endl;
+//       std::cout << std::setprecision(9) << compute_rcp_power_of_two<float, std::uint64_t>() << std::endl;
+//       std::cout << std::setprecision(17) << compute_rcp_power_of_two<double, std::uint64_t>() << std::endl;
+//   }
+//
+// Run this code on Coliru:
+//
+//   http://coliru.stacked-crooked.com/a/05d58a1b19118b8e
+//
+// Output:
+//
+//   2.32830616e-10
+//   2.3283064365386963e-10
+//   5.42101022e-20
+//   5.421010862427521e-20
+//
+
+// Return a constant that, when multiplied by 2^32 - 1 (0xFFFFFFFF), equals the largest value strictly smaller than 1.0.
+template <typename T> inline T Rcp2Pow32();
+template <> inline float Rcp2Pow32<float>()         { return 2.32830616e-10f; }
+template <> inline double Rcp2Pow32<double>()       { return 2.3283064365386963e-10; }
+
+// Return a constant that, when multiplied by 2^64 - 1 (0xFFFFFFFFFFFFFFFF), equals the largest value strictly smaller than 1.0.
+template <typename T> inline T Rcp2Pow64();
+template <> inline float Rcp2Pow64<float>()         { return 5.42101022e-20f; }
+template <> inline double Rcp2Pow64<double>()       { return 5.421010862427521e-20; }
 
 
 //
@@ -112,6 +178,14 @@ T cube(const T x);
 template <typename T>
 T rcp(const T x);
 
+// Return 1 / x or eps if the absolute value of x is less than eps.
+template <typename T>
+T safe_rcp(const T x, const T eps);
+
+// Return the square root of x or 0 if x is negative.
+template <typename T>
+T safe_sqrt(const T x);
+
 // Compile-time exponentiation of the form x^p where p >= 0.
 // Note: swapped template arguments to allow writing pow_int<3>(3.14).
 template <size_t P, typename T>
@@ -123,8 +197,8 @@ T pow_int(const T x, size_t p);
 
 // Return the smallest power of 2 larger than a given integer x (x > 0).
 template <typename T> T next_pow2(T x);
-template <> int64 next_pow2<int64>(int64 x);
-template <> uint64 next_pow2<uint64>(uint64 x);
+template <> std::int64_t next_pow2<std::int64_t>(std::int64_t x);
+template <> std::uint64_t next_pow2<std::uint64_t>(std::uint64_t x);
 
 // Return true if a given integer x is a power of 2.
 template <typename T>
@@ -209,10 +283,10 @@ T mod(const T a, const T n);
 
 // Rotate an unsigned integer left or right by a given number of bits.
 // Reference: https://stackoverflow.com/a/776523/393756
-uint32 rotl32(const uint32 n, unsigned int shift);
-uint64 rotl64(const uint64 n, unsigned int shift);
-uint32 rotr32(const uint32 n, unsigned int shift);
-uint64 rotr64(const uint64 n, unsigned int shift);
+std::uint32_t rotl32(const std::uint32_t n, unsigned int shift);
+std::uint64_t rotl64(const std::uint64_t n, unsigned int shift);
+std::uint32_t rotr32(const std::uint32_t n, unsigned int shift);
+std::uint64_t rotr64(const std::uint64_t n, unsigned int shift);
 
 // linearstep() returns 0 for x < a, 1 for x > b, and generates
 // a linear transition from 0 to 1 between x = a and x = b.
@@ -243,20 +317,13 @@ T inverse_lerp(const T a, const T b, const U x);
 // fit() remaps a variable x from the range [min_x, max_x] to the
 // range [min_y, max_y]. When x is outside the [min_x, max_x] range,
 // a linear extrapolation outside the [min_y, max_y] range is used.
-template <typename T>
-T fit(
-    const T x,
-    const T min_x,
-    const T max_x,
-    const T min_y,
-    const T max_y);
-template <typename U, typename V>
-V fit(
-    const U x,
-    const U min_x,
-    const U max_x,
-    const V min_y,
-    const V max_y);
+template <typename In, typename Out = In, typename Interpolant = Out>
+Out fit(
+    const In x,
+    const In min_x,
+    const In max_x,
+    const Out min_y,
+    const Out max_y);
 
 
 //
@@ -369,6 +436,18 @@ inline T rcp(const T x)
     return T(1.0) / x;
 }
 
+template <typename T>
+inline T safe_rcp(const T x, const T eps)
+{
+    return std::abs(x) < eps ? eps : T(1.0) / x;
+}
+
+template <typename T>
+inline T safe_sqrt(const T x)
+{
+    return std::sqrt(std::max(x, T(0.0)));
+}
+
 template <typename T, size_t P>
 struct PowIntHelper
 {
@@ -436,7 +515,7 @@ inline T next_pow2(T x)
 }
 
 template <>
-inline int64 next_pow2<int64>(int64 x)
+inline std::int64_t next_pow2<std::int64_t>(std::int64_t x)
 {
     assert(x > 0);
     --x;
@@ -450,7 +529,7 @@ inline int64 next_pow2<int64>(int64 x)
 }
 
 template <>
-inline uint64 next_pow2<uint64>(uint64 x)
+inline std::uint64_t next_pow2<std::uint64_t>(std::uint64_t x)
 {
     assert(x > 0);
     --x;
@@ -486,27 +565,27 @@ inline T log2_int(T x)
 #if defined _MSC_VER
 
 template <>
-inline uint32 log2_int(const uint32 x)
+inline std::uint32_t log2_int(const std::uint32_t x)
 {
     assert(x > 0);
 
     unsigned long index;
     _BitScanReverse(&index, x);
 
-    return static_cast<uint32>(index);
+    return static_cast<std::uint32_t>(index);
 }
 
 #ifdef APPLESEED_ARCH64
 
 template <>
-inline uint64 log2_int(const uint64 x)
+inline std::uint64_t log2_int(const std::uint64_t x)
 {
     assert(x > 0);
 
     unsigned long index;
     _BitScanReverse64(&index, x);
 
-    return static_cast<uint64>(index);
+    return static_cast<std::uint64_t>(index);
 }
 
 #endif
@@ -619,51 +698,51 @@ inline Int truncate(const T x)
 #ifdef APPLESEED_USE_SSE
 
 template <>
-inline int8 truncate<int8>(const float x)
+inline std::int8_t truncate<std::int8_t>(const float x)
 {
-    return static_cast<int8>(_mm_cvttss_si32(_mm_load_ss(&x)));
+    return static_cast<std::int8_t>(_mm_cvttss_si32(_mm_load_ss(&x)));
 }
 
 template <>
-inline int16 truncate<int16>(const float x)
+inline std::int16_t truncate<std::int16_t>(const float x)
 {
-    return static_cast<int16>(_mm_cvttss_si32(_mm_load_ss(&x)));
+    return static_cast<std::int16_t>(_mm_cvttss_si32(_mm_load_ss(&x)));
 }
 
 template <>
-inline int32 truncate<int32>(const float x)
+inline std::int32_t truncate<std::int32_t>(const float x)
 {
-    return static_cast<int32>(_mm_cvttss_si32(_mm_load_ss(&x)));
+    return static_cast<std::int32_t>(_mm_cvttss_si32(_mm_load_ss(&x)));
 }
 
 template <>
-inline int64 truncate<int64>(const float x)
+inline std::int64_t truncate<std::int64_t>(const float x)
 {
-    return static_cast<int64>(_mm_cvttss_si32(_mm_load_ss(&x)));
+    return static_cast<std::int64_t>(_mm_cvttss_si32(_mm_load_ss(&x)));
 }
 
 template <>
-inline int8 truncate<int8>(const double x)
+inline std::int8_t truncate<std::int8_t>(const double x)
 {
-    return static_cast<int8>(_mm_cvttsd_si32(_mm_load_sd(&x)));
+    return static_cast<std::int8_t>(_mm_cvttsd_si32(_mm_load_sd(&x)));
 }
 
 template <>
-inline int16 truncate<int16>(const double x)
+inline std::int16_t truncate<std::int16_t>(const double x)
 {
-    return static_cast<int16>(_mm_cvttsd_si32(_mm_load_sd(&x)));
+    return static_cast<std::int16_t>(_mm_cvttsd_si32(_mm_load_sd(&x)));
 }
 
 template <>
-inline int32 truncate<int32>(const double x)
+inline std::int32_t truncate<std::int32_t>(const double x)
 {
-    return static_cast<int32>(_mm_cvttsd_si32(_mm_load_sd(&x)));
+    return static_cast<std::int32_t>(_mm_cvttsd_si32(_mm_load_sd(&x)));
 }
 
 template <>
-inline int64 truncate<int64>(const double x)
+inline std::int64_t truncate<std::int64_t>(const double x)
 {
-    return static_cast<int64>(_mm_cvttsd_si32(_mm_load_sd(&x)));
+    return static_cast<std::int64_t>(_mm_cvttsd_si32(_mm_load_sd(&x)));
 }
 
 #endif
@@ -768,7 +847,7 @@ inline double mod(const double a, const double n)
 #pragma warning (push)
 #pragma warning (disable : 4146)    // unary minus operator applied to unsigned type, result still unsigned
 
-inline uint32 rotl32(const uint32 n, unsigned int shift)
+inline std::uint32_t rotl32(const std::uint32_t n, unsigned int shift)
 {
     const unsigned int Mask = 8 * sizeof(n) - 1;
     assert(shift <= Mask);
@@ -781,7 +860,7 @@ inline uint32 rotl32(const uint32 n, unsigned int shift)
 #endif
 }
 
-inline uint64 rotl64(const uint64 n, unsigned int shift)
+inline std::uint64_t rotl64(const std::uint64_t n, unsigned int shift)
 {
     const unsigned int Mask = 8 * sizeof(n) - 1;
     assert(shift <= Mask);
@@ -794,7 +873,7 @@ inline uint64 rotl64(const uint64 n, unsigned int shift)
 #endif
 }
 
-inline uint32 rotr32(const uint32 n, unsigned int shift)
+inline std::uint32_t rotr32(const std::uint32_t n, unsigned int shift)
 {
     const unsigned int Mask = 8 * sizeof(n) - 1;
     assert(shift <= Mask);
@@ -807,7 +886,7 @@ inline uint32 rotr32(const uint32 n, unsigned int shift)
 #endif
 }
 
-inline uint64 rotr64(const uint64 n, unsigned int shift)
+inline std::uint64_t rotr64(const std::uint64_t n, unsigned int shift)
 {
     const unsigned int Mask = 8 * sizeof(n) - 1;
     assert(shift <= Mask);
@@ -861,38 +940,21 @@ template <typename T, typename U>
 inline T inverse_lerp(const T a, const T b, const U x)
 {
     assert(a != b);
-
     return (x - a) / (b - a);
 }
 
-template <typename T>
-inline T fit(
-    const T x,
-    const T min_x,
-    const T max_x,
-    const T min_y,
-    const T max_y)
+template <typename In, typename Out, typename Interpolant>
+inline Out fit(
+    const In x,
+    const In min_x,
+    const In max_x,
+    const Out min_y,
+    const Out max_y)
 {
     assert(min_x != max_x);
-
-    const T k = (x - min_x) / (max_x - min_x);
-
-    return min_y * (T(1.0) - k) + max_y * k;
-}
-
-template <typename U, typename V>
-inline V fit(
-    const U x,
-    const U min_x,
-    const U max_x,
-    const V min_y,
-    const V max_y)
-{
-    assert(min_x != max_x);
-
-    const V k = static_cast<V>(x - min_x) / (max_x - min_x);
-
-    return min_y * (V(1.0) - k) + max_y * k;
+    const Interpolant k = Interpolant(x - min_x) / Interpolant(max_x - min_x);
+    const Out result = min_y * (Interpolant(1.0) - k) + max_y * k;
+    return result;
 }
 
 

@@ -29,6 +29,18 @@
 
 
 #--------------------------------------------------------------------------------------------------
+# Include directories.
+#--------------------------------------------------------------------------------------------------
+
+if (WITH_GPU)
+    include_directories (
+        ${CUDA_INCLUDE_DIRS}
+        ${OPTIX_INCLUDE_DIR}
+    )
+endif ()
+
+
+#--------------------------------------------------------------------------------------------------
 # Source files.
 #--------------------------------------------------------------------------------------------------
 
@@ -38,13 +50,15 @@ set (foundation_array_sources
     foundation/array/applyvisitor.h
     foundation/array/array.cpp
     foundation/array/array.h
+    foundation/array/arrayallocator.h
     foundation/array/arrayref.h
+    foundation/array/arraytraits.cpp
     foundation/array/arraytraits.h
     foundation/array/arrayview.h
     foundation/array/exception.cpp
     foundation/array/exception.h
-    foundation/array/meshalgorithm.cpp
-    foundation/array/meshalgorithm.h
+    foundation/array/keyframedarray.cpp
+    foundation/array/keyframedarray.h
 )
 list (APPEND appleseed_sources
     ${foundation_array_sources}
@@ -65,6 +79,19 @@ source_group ("foundation\\core\\concepts" FILES
     ${foundation_core_concepts_sources}
 )
 
+set (foundation_containers_sources
+    foundation/containers/alignedvector.h
+    foundation/containers/dictionary.cpp
+    foundation/containers/dictionary.h
+    foundation/containers/hashtable.h
+)
+list (APPEND appleseed_sources
+    ${foundation_containers_sources}
+)
+source_group ("foundation\\containers" FILES
+    ${foundation_containers_sources}
+)
+
 set (foundation_core_exceptions_sources
     foundation/core/exceptions/exception.h
     foundation/core/exceptions/exceptionioerror.h
@@ -82,6 +109,7 @@ source_group ("foundation\\core\\exceptions" FILES
 set (foundation_core_sources
     foundation/core/appleseed.cpp
     foundation/core/appleseed.h
+    foundation/core/buildoptions.h.in
     foundation/core/thirdparties.cpp
     foundation/core/thirdparties.h
     foundation/core/version.h.in
@@ -92,6 +120,25 @@ list (APPEND appleseed_sources
 source_group ("foundation\\core" FILES
     ${foundation_core_sources}
 )
+
+if (WITH_GPU)
+    set (foundation_cuda_sources
+        foundation/cuda/cudadevice.cpp
+        foundation/cuda/cudadevice.h
+        foundation/cuda/exception.cpp
+        foundation/cuda/exception.h
+        foundation/cuda/memory.cpp
+        foundation/cuda/memory.h
+        foundation/cuda/module.cpp
+        foundation/cuda/module.h
+    )
+    list (APPEND appleseed_sources
+        ${foundation_cuda_sources}
+    )
+    source_group ("foundation\\cuda" FILES
+        ${foundation_cuda_sources}
+    )
+endif ()
 
 set (foundation_curve_sources
     foundation/curve/binarycurvefilereader.cpp
@@ -116,6 +163,20 @@ list (APPEND appleseed_sources
 )
 source_group ("foundation\\curve" FILES
     ${foundation_curve_sources}
+)
+
+set (foundation_hash_sources
+    foundation/hash/hash.h
+    foundation/hash/murmurhash.cpp
+    foundation/hash/murmurhash.h
+    foundation/hash/siphash.cpp
+    foundation/hash/siphash.h
+)
+list (APPEND appleseed_sources
+    ${foundation_hash_sources}
+)
+source_group ("foundation\\hash" FILES
+    ${foundation_hash_sources}
 )
 
 set (foundation_image_text_sources
@@ -178,6 +239,34 @@ source_group ("foundation\\image" FILES
     ${foundation_image_sources}
 )
 
+set (foundation_log_sources
+    foundation/log/consolelogtarget.cpp
+    foundation/log/consolelogtarget.h
+    foundation/log/filelogtarget.cpp
+    foundation/log/filelogtarget.h
+    foundation/log/filelogtargetbase.cpp
+    foundation/log/filelogtargetbase.h
+    foundation/log/helpers.h
+    foundation/log/ilogtarget.h
+    foundation/log/log.h
+    foundation/log/logformatter.cpp
+    foundation/log/logformatter.h
+    foundation/log/logger.cpp
+    foundation/log/logger.h
+    foundation/log/logmessage.cpp
+    foundation/log/logmessage.h
+    foundation/log/openfilelogtarget.cpp
+    foundation/log/openfilelogtarget.h
+    foundation/log/stringlogtarget.cpp
+    foundation/log/stringlogtarget.h
+)
+list (APPEND appleseed_sources
+    ${foundation_log_sources}
+)
+source_group ("foundation\\log" FILES
+    ${foundation_log_sources}
+)
+
 set (foundation_math_bsp_sources
     foundation/math/bsp/bsp_builder.h
     foundation/math/bsp/bsp_intersector.h
@@ -237,6 +326,7 @@ source_group ("foundation\\math\\intersection" FILES
 )
 
 set (foundation_math_knn_sources
+    foundation/math/knn/knn_anyquery.h
     foundation/math/knn/knn_answer.h
     foundation/math/knn/knn_builder.h
     foundation/math/knn/knn_node.h
@@ -282,6 +372,8 @@ set (foundation_math_sampling_sources
     foundation/math/sampling/qmcsamplingcontext.h
     foundation/math/sampling/rngsamplingcontext.h
     foundation/math/sampling/sphericalimportancesampler.h
+    foundation/math/sampling/sphericalrectanglesampler.h
+    foundation/math/sampling/sphericaltrianglesampler.h
 )
 list (APPEND appleseed_sources
     ${foundation_math_sampling_sources}
@@ -327,7 +419,6 @@ set (foundation_math_sources
     foundation/math/frustum.h
     foundation/math/half.cpp
     foundation/math/half.h
-    foundation/math/hash.h
     foundation/math/knn.h
     foundation/math/matrix.h
     foundation/math/microfacet.cpp
@@ -372,31 +463,48 @@ source_group ("foundation\\math" FILES
     ${foundation_math_sources}
 )
 
-set (foundation_mesh_sources
-    foundation/mesh/binarymeshfilereader.cpp
-    foundation/mesh/binarymeshfilereader.h
-    foundation/mesh/binarymeshfilewriter.cpp
-    foundation/mesh/binarymeshfilewriter.h
-    foundation/mesh/genericmeshfilereader.cpp
-    foundation/mesh/genericmeshfilereader.h
-    foundation/mesh/genericmeshfilewriter.cpp
-    foundation/mesh/genericmeshfilewriter.h
-    foundation/mesh/imeshbuilder.h
-    foundation/mesh/imeshfilereader.h
-    foundation/mesh/imeshfilewriter.h
-    foundation/mesh/imeshwalker.h
-    foundation/mesh/meshbuilderbase.h
-    foundation/mesh/objmeshfilelexer.h
-    foundation/mesh/objmeshfilereader.cpp
-    foundation/mesh/objmeshfilereader.h
-    foundation/mesh/objmeshfilewriter.cpp
-    foundation/mesh/objmeshfilewriter.h
+set (foundation_memory_sources
+    foundation/memory/alignedallocator.h
+    foundation/memory/arena.h
+    foundation/memory/autoreleaseptr.h
+    foundation/memory/copyonwrite.h
+    foundation/memory/memory.cpp
+    foundation/memory/memory.h
+    foundation/memory/poolallocator.h
+    foundation/memory/stampedptr.h
 )
 list (APPEND appleseed_sources
-    ${foundation_mesh_sources}
+    ${foundation_memory_sources}
 )
-source_group ("foundation\\mesh" FILES
-    ${foundation_mesh_sources}
+source_group ("foundation\\memory" FILES
+    ${foundation_memory_sources}
+)
+
+set (foundation_meshio_sources
+    foundation/meshio/binarymeshfilereader.cpp
+    foundation/meshio/binarymeshfilereader.h
+    foundation/meshio/binarymeshfilewriter.cpp
+    foundation/meshio/binarymeshfilewriter.h
+    foundation/meshio/genericmeshfilereader.cpp
+    foundation/meshio/genericmeshfilereader.h
+    foundation/meshio/genericmeshfilewriter.cpp
+    foundation/meshio/genericmeshfilewriter.h
+    foundation/meshio/imeshbuilder.h
+    foundation/meshio/imeshfilereader.h
+    foundation/meshio/imeshfilewriter.h
+    foundation/meshio/imeshwalker.h
+    foundation/meshio/meshbuilderbase.h
+    foundation/meshio/objmeshfilelexer.h
+    foundation/meshio/objmeshfilereader.cpp
+    foundation/meshio/objmeshfilereader.h
+    foundation/meshio/objmeshfilewriter.cpp
+    foundation/meshio/objmeshfilewriter.h
+)
+list (APPEND appleseed_sources
+    ${foundation_meshio_sources}
+)
+source_group ("foundation\\meshio" FILES
+    ${foundation_meshio_sources}
 )
 
 set (foundation_meta_benchmarks_sources
@@ -482,6 +590,7 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_iesparser.cpp
     foundation/meta/tests/test_image.cpp
     foundation/meta/tests/test_imageimportancesampler.cpp
+    foundation/meta/tests/test_internedstring.cpp
     foundation/meta/tests/test_intersection_frustumaabb.cpp
     foundation/meta/tests/test_intersection_frustumsegment.cpp
     foundation/meta/tests/test_intersection_planesegment.cpp
@@ -490,6 +599,7 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_intersection_raytriangle.cpp
     foundation/meta/tests/test_iostreamop.cpp
     foundation/meta/tests/test_job.cpp
+    foundation/meta/tests/test_keyframedarray.cpp
     foundation/meta/tests/test_knn.cpp
     foundation/meta/tests/test_kvpair.cpp
     foundation/meta/tests/test_lazy.cpp
@@ -527,10 +637,12 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_snprintf.cpp
     foundation/meta/tests/test_sphericalimportancesampler.cpp
     foundation/meta/tests/test_spline.cpp
+    foundation/meta/tests/test_stampedptr.cpp
     foundation/meta/tests/test_statistics.cpp
     foundation/meta/tests/test_stlallocatortestbed.cpp
     foundation/meta/tests/test_stopwatch.cpp
     foundation/meta/tests/test_string.cpp
+    foundation/meta/tests/test_tea.cpp
     foundation/meta/tests/test_test.cpp
     foundation/meta/tests/test_thread.cpp
     foundation/meta/tests/test_tile.cpp
@@ -542,13 +654,9 @@ set (foundation_meta_tests_sources
     foundation/meta/tests/test_vector.cpp
     foundation/meta/tests/test_voxelgrid.cpp
     foundation/meta/tests/test_windows.cpp
+    foundation/meta/tests/test_z85.cpp
     foundation/meta/tests/test_zip.cpp
 )
-if (WITH_DISNEY_MATERIAL)
-    list (APPEND foundation_meta_tests_sources
-        foundation/meta/tests/test_seexpr.cpp
-    )
-endif ()
 list (APPEND appleseed_sources
     ${foundation_meta_tests_sources}
 )
@@ -648,6 +756,19 @@ source_group ("foundation\\resources\\logo" FILES
     ${foundation_resources_logo_sources}
 )
 
+set (foundation_string_sources
+    foundation/string/internedstring.cpp
+    foundation/string/internedstring.h
+    foundation/string/string.cpp
+    foundation/string/string.h
+)
+list (APPEND appleseed_sources
+    ${foundation_string_sources}
+)
+source_group ("foundation\\string" FILES
+    ${foundation_string_sources}
+)
+
 set (foundation_utility_api_sources
     foundation/utility/api/apiarray.h
     foundation/utility/api/apistring.cpp
@@ -710,18 +831,6 @@ source_group ("foundation\\utility\\commandlineparser" FILES
     ${foundation_utility_commandlineparser_sources}
 )
 
-set (foundation_utility_containers_sources
-    foundation/utility/containers/dictionary.cpp
-    foundation/utility/containers/dictionary.h
-    foundation/utility/containers/hashtable.h
-)
-list (APPEND appleseed_sources
-    ${foundation_utility_containers_sources}
-)
-source_group ("foundation\\utility\\containers" FILES
-    ${foundation_utility_containers_sources}
-)
-
 set (foundation_utility_filter_sources
     foundation/utility/filter/ifilter.h
     foundation/utility/filter/passthroughfilter.h
@@ -752,33 +861,6 @@ list (APPEND appleseed_sources
 )
 source_group ("foundation\\utility\\job" FILES
     ${foundation_utility_job_sources}
-)
-
-set (foundation_utility_log_sources
-    foundation/utility/log/consolelogtarget.cpp
-    foundation/utility/log/consolelogtarget.h
-    foundation/utility/log/filelogtarget.cpp
-    foundation/utility/log/filelogtarget.h
-    foundation/utility/log/filelogtargetbase.cpp
-    foundation/utility/log/filelogtargetbase.h
-    foundation/utility/log/helpers.h
-    foundation/utility/log/ilogtarget.h
-    foundation/utility/log/logformatter.cpp
-    foundation/utility/log/logformatter.h
-    foundation/utility/log/logger.cpp
-    foundation/utility/log/logger.h
-    foundation/utility/log/logmessage.cpp
-    foundation/utility/log/logmessage.h
-    foundation/utility/log/openfilelogtarget.cpp
-    foundation/utility/log/openfilelogtarget.h
-    foundation/utility/log/stringlogtarget.cpp
-    foundation/utility/log/stringlogtarget.h
-)
-list (APPEND appleseed_sources
-    ${foundation_utility_log_sources}
-)
-source_group ("foundation\\utility\\log" FILES
-    ${foundation_utility_log_sources}
 )
 
 set (foundation_utility_minizip_sources
@@ -852,12 +934,8 @@ source_group ("foundation\\utility\\ui" FILES
 )
 
 set (foundation_utility_sources
-    foundation/utility/alignedallocator.h
-    foundation/utility/alignedvector.h
-    foundation/utility/arena.h
     foundation/utility/attributeset.cpp
     foundation/utility/attributeset.h
-    foundation/utility/autoreleaseptr.h
     foundation/utility/benchmark.h
     foundation/utility/bitmask.h
     foundation/utility/bufferedfile.cpp
@@ -867,7 +945,6 @@ set (foundation_utility_sources
     foundation/utility/casts.h
     foundation/utility/cc.h
     foundation/utility/commandlineparser.h
-    foundation/utility/copyonwrite.h
     foundation/utility/countof.h
     foundation/utility/filter.h
     foundation/utility/foreach.h
@@ -882,29 +959,20 @@ set (foundation_utility_sources
     foundation/utility/job.h
     foundation/utility/kvpair.h
     foundation/utility/lazy.h
-    foundation/utility/log.h
     foundation/utility/makevector.h
-    foundation/utility/memory.cpp
-    foundation/utility/memory.h
-    foundation/utility/murmurhash.cpp
-    foundation/utility/murmurhash.h
     foundation/utility/numerictype.h
     foundation/utility/otherwise.h
     foundation/utility/poison.h
-    foundation/utility/poolallocator.h
     foundation/utility/preprocessor.cpp
     foundation/utility/preprocessor.h
     foundation/utility/registrar.h
     foundation/utility/searchpaths.cpp
     foundation/utility/searchpaths.h
     foundation/utility/settings.h
-    foundation/utility/siphash.cpp
-    foundation/utility/siphash.h
     foundation/utility/statistics.cpp
     foundation/utility/statistics.h
     foundation/utility/stopwatch.h
-    foundation/utility/string.cpp
-    foundation/utility/string.h
+    foundation/utility/tea.h
     foundation/utility/test.h
     foundation/utility/testutils.cpp
     foundation/utility/testutils.h
@@ -918,15 +986,11 @@ set (foundation_utility_sources
     foundation/utility/xercesc.cpp
     foundation/utility/xercesc.h
     foundation/utility/xmlelement.h
+    foundation/utility/z85.cpp
+    foundation/utility/z85.h
     foundation/utility/zip.cpp
     foundation/utility/zip.h
 )
-if (WITH_DISNEY_MATERIAL)
-    list (APPEND foundation_utility_sources
-        foundation/utility/seexpr.cpp
-        foundation/utility/seexpr.h
-    )
-endif ()
 list (APPEND appleseed_sources
     ${foundation_utility_sources}
 )
@@ -979,7 +1043,6 @@ set (renderer_api_sources
     renderer/api/trace.h
     renderer/api/types.h
     renderer/api/utility.h
-    renderer/api/version.h
     renderer/api/volume.h
 )
 list (APPEND appleseed_sources
@@ -987,6 +1050,31 @@ list (APPEND appleseed_sources
 )
 source_group ("renderer\\api" FILES
     ${renderer_api_sources}
+)
+
+set (renderer_device_sources
+    renderer/device/irendercontext.h
+    renderer/device/irenderdevice.h
+    renderer/device/renderdevicebase.cpp
+    renderer/device/renderdevicebase.h
+)
+list (APPEND appleseed_sources
+    ${renderer_device_sources}
+)
+source_group ("renderer\\device" FILES
+    ${renderer_device_sources}
+)
+
+set (renderer_device_cpu_sources
+    renderer/device/cpu/cpurendercontext.h
+    renderer/device/cpu/cpurenderdevice.cpp
+    renderer/device/cpu/cpurenderdevice.h
+)
+list (APPEND appleseed_sources
+    ${renderer_device_cpu_sources}
+)
+source_group ("renderer\\device\\cpu" FILES
+    ${renderer_device_cpu_sources}
 )
 
 set (renderer_global_sources
@@ -1041,6 +1129,7 @@ set (renderer_kernel_intersection_sources
     renderer/kernel/intersection/intersector.cpp
     renderer/kernel/intersection/intersector.h
     renderer/kernel/intersection/probevisitorbase.h
+    renderer/kernel/intersection/refining.h
     renderer/kernel/intersection/tracecontext.cpp
     renderer/kernel/intersection/tracecontext.h
     renderer/kernel/intersection/treerepository.h
@@ -1110,8 +1199,12 @@ source_group ("renderer\\kernel\\lighting\\pt" FILES
 )
 
 set (renderer_kernel_lighting_sppm_sources
+    renderer/kernel/lighting/sppm/sppmimporton.h
+    renderer/kernel/lighting/sppm/sppmimportonmap.cpp
+    renderer/kernel/lighting/sppm/sppmimportonmap.h
     renderer/kernel/lighting/sppm/sppmlightingengine.cpp
     renderer/kernel/lighting/sppm/sppmlightingengine.h
+    renderer/kernel/lighting/sppm/sppmlightingengineworkingset.h
     renderer/kernel/lighting/sppm/sppmparameters.cpp
     renderer/kernel/lighting/sppm/sppmparameters.h
     renderer/kernel/lighting/sppm/sppmpasscallback.cpp
@@ -1144,13 +1237,13 @@ set (renderer_kernel_lighting_sources
     renderer/kernel/lighting/lightpathrecorder.h
     renderer/kernel/lighting/lightpathstream.cpp
     renderer/kernel/lighting/lightpathstream.h
-    renderer/kernel/lighting/lightsample.cpp
     renderer/kernel/lighting/lightsample.h
     renderer/kernel/lighting/lightsamplerbase.cpp
     renderer/kernel/lighting/lightsamplerbase.h
     renderer/kernel/lighting/lighttree.cpp
     renderer/kernel/lighting/lighttree.h
     renderer/kernel/lighting/lighttree_node.h
+    renderer/kernel/lighting/lighttypes.cpp
     renderer/kernel/lighting/lighttypes.h
     renderer/kernel/lighting/materialsamplers.cpp
     renderer/kernel/lighting/materialsamplers.h
@@ -1213,9 +1306,10 @@ set (renderer_kernel_rendering_final_sources
     renderer/kernel/rendering/final/adaptivetilerenderer.h
     renderer/kernel/rendering/final/pixelsampler.cpp
     renderer/kernel/rendering/final/pixelsampler.h
+    renderer/kernel/rendering/final/texturecontrolledpixelrenderer.cpp
+    renderer/kernel/rendering/final/texturecontrolledpixelrenderer.h
     renderer/kernel/rendering/final/uniformpixelrenderer.cpp
     renderer/kernel/rendering/final/uniformpixelrenderer.h
-    renderer/kernel/rendering/final/variationtracker.h
 )
 list (APPEND appleseed_sources
     ${renderer_kernel_rendering_final_sources}
@@ -1292,6 +1386,8 @@ set (renderer_kernel_rendering_sources
     renderer/kernel/rendering/pixelrendererbase.h
     renderer/kernel/rendering/renderercomponents.cpp
     renderer/kernel/rendering/renderercomponents.h
+    renderer/kernel/rendering/renderercontrollercollection.cpp
+    renderer/kernel/rendering/renderercontrollercollection.h
     renderer/kernel/rendering/rendererservices.cpp
     renderer/kernel/rendering/rendererservices.h
     renderer/kernel/rendering/sample.h
@@ -1394,6 +1490,7 @@ set (renderer_meta_benchmarks_sources
     renderer/meta/benchmarks/benchmark_dynamicspectrum.cpp
     renderer/meta/benchmarks/benchmark_frame.cpp
     renderer/meta/benchmarks/benchmark_localsampleaccumulationbuffer.cpp
+    renderer/meta/benchmarks/benchmark_shadowterminator.cpp
     renderer/meta/benchmarks/benchmark_transformsequence.cpp
 )
 list (APPEND appleseed_sources
@@ -1423,6 +1520,7 @@ set (renderer_meta_tests_sources
     renderer/meta/tests/test_pixelsampler.cpp
     renderer/meta/tests/test_projectfilereader.cpp
     renderer/meta/tests/test_projectfilewriter.cpp
+    renderer/meta/tests/test_rgbspectrum.cpp
     renderer/meta/tests/test_samplecounter.cpp
     renderer/meta/tests/test_samplecounthistory.cpp
     renderer/meta/tests/test_samplegeneratorjob.cpp
@@ -1434,7 +1532,6 @@ set (renderer_meta_tests_sources
     renderer/meta/tests/test_texturestore.cpp
     renderer/meta/tests/test_tracer.cpp
     renderer/meta/tests/test_transformsequence.cpp
-    renderer/meta/tests/test_variationtracker.cpp
     renderer/meta/tests/test_volume.cpp
 )
 list (APPEND appleseed_sources
@@ -1526,6 +1623,10 @@ set (renderer_modeling_bsdf_sources
     renderer/modeling/bsdf/glassbsdf.h
     renderer/modeling/bsdf/glossybrdf.cpp
     renderer/modeling/bsdf/glossybrdf.h
+    renderer/modeling/bsdf/glossylayerbsdf.cpp
+    renderer/modeling/bsdf/glossylayerbsdf.h
+    renderer/modeling/bsdf/hairbsdf.cpp
+    renderer/modeling/bsdf/hairbsdf.h
     renderer/modeling/bsdf/ibsdffactory.h
     renderer/modeling/bsdf/kelemenbrdf.cpp
     renderer/modeling/bsdf/kelemenbrdf.h
@@ -1550,12 +1651,6 @@ set (renderer_modeling_bsdf_sources
     renderer/modeling/bsdf/specularbtdf.h
     renderer/modeling/bsdf/specularhelper.h
 )
-if (WITH_DISNEY_MATERIAL)
-    list (APPEND renderer_modeling_bsdf_sources
-        renderer/modeling/bsdf/disneylayeredbrdf.cpp
-        renderer/modeling/bsdf/disneylayeredbrdf.h
-    )
-endif ()
 list (APPEND appleseed_sources
     ${renderer_modeling_bsdf_sources}
 )
@@ -1784,7 +1879,6 @@ set (renderer_modeling_input_sources
     renderer/modeling/input/inputbinder.h
     renderer/modeling/input/scalarsource.h
     renderer/modeling/input/sourceinputs.h
-    renderer/modeling/input/sourceinputs.cpp
     renderer/modeling/input/source.h
     renderer/modeling/input/symbol.h
     renderer/modeling/input/texturesource.cpp
@@ -1845,12 +1939,6 @@ set (renderer_modeling_material_sources
     renderer/modeling/material/oslmaterial.cpp
     renderer/modeling/material/oslmaterial.h
 )
-if (WITH_DISNEY_MATERIAL)
-    list (APPEND renderer_modeling_material_sources
-        renderer/modeling/material/disneymaterial.cpp
-        renderer/modeling/material/disneymaterial.h
-    )
-endif ()
 list (APPEND appleseed_sources
     ${renderer_modeling_material_sources}
 )
@@ -1912,6 +2000,8 @@ set (renderer_modeling_postprocessingstage_sources
     renderer/modeling/postprocessingstage/postprocessingstagetraits.h
     renderer/modeling/postprocessingstage/renderstamppostprocessingstage.cpp
     renderer/modeling/postprocessingstage/renderstamppostprocessingstage.h
+    renderer/modeling/postprocessingstage/vignettepostprocessingstage.cpp
+    renderer/modeling/postprocessingstage/vignettepostprocessingstage.h
 )
 list (APPEND appleseed_sources
     ${renderer_modeling_postprocessingstage_sources}
@@ -1939,6 +2029,11 @@ set (renderer_modeling_project_sources
     renderer/modeling/project/projectformatrevision.h
     renderer/modeling/project/projecttracker.cpp
     renderer/modeling/project/projecttracker.h
+    renderer/modeling/project/renderingtimer.h
+    renderer/modeling/project/xmlprojectfilereader.cpp
+    renderer/modeling/project/xmlprojectfilereader.h
+    renderer/modeling/project/xmlprojectfilewriter.cpp
+    renderer/modeling/project/xmlprojectfilewriter.h
 )
 list (APPEND appleseed_sources
     ${renderer_modeling_project_sources}
@@ -2056,6 +2151,7 @@ set (renderer_modeling_texture_sources
     renderer/modeling/texture/texturefactoryregistrar.cpp
     renderer/modeling/texture/texturefactoryregistrar.h
     renderer/modeling/texture/texturetraits.h
+    renderer/modeling/texture/tileptr.h
 )
 list (APPEND appleseed_sources
     ${renderer_modeling_texture_sources}
@@ -2073,6 +2169,8 @@ set (renderer_utility_sources
     renderer/utility/iostreamop.h
     renderer/utility/messagecontext.cpp
     renderer/utility/messagecontext.h
+    renderer/utility/oiiomaketexture.cpp
+    renderer/utility/oiiomaketexture.h
     renderer/utility/paramarray.cpp
     renderer/utility/paramarray.h
     renderer/utility/plugin.cpp
@@ -2081,15 +2179,17 @@ set (renderer_utility_sources
     renderer/utility/pluginstore.h
     renderer/utility/projectpoints.cpp
     renderer/utility/projectpoints.h
-    renderer/utility/seexpr.h
+    renderer/utility/rgbspectrum.h
     renderer/utility/settingsparsing.cpp
     renderer/utility/settingsparsing.h
+    renderer/utility/shadowterminator.h
     renderer/utility/spectrumclamp.h
     renderer/utility/stochasticcast.h
     renderer/utility/testutils.cpp
     renderer/utility/testutils.h
     renderer/utility/transformsequence.cpp
     renderer/utility/transformsequence.h
+    renderer/utility/transformsequencestack.h
     renderer/utility/triangle.h
 )
 list (APPEND appleseed_sources
@@ -2130,11 +2230,79 @@ set_source_files_properties (${appleseed_schema_files} PROPERTIES
 
 
 #--------------------------------------------------------------------------------------------------
+# CUDA compilation.
+#--------------------------------------------------------------------------------------------------
+
+if (WITH_GPU)
+    # Build lists of absolute paths to kernel header files.
+    foreach (cuda_header ${appleseed_cuda_headers})
+        list (APPEND abs_cuda_headers_sources ${PROJECT_SOURCE_DIR}/src/appleseed/${cuda_header})
+    endforeach ()
+
+    # Build the sandbox destination directory path.
+    set (kernels_dir "${PROJECT_SOURCE_DIR}/sandbox/kernels")
+
+    # Compile PTX into the sandbox.
+    foreach (ptx_source ${appleseed_ptx_sources})
+        # Build the .ptx destination file name.
+        get_filename_component (ptx_source_we ${ptx_source} NAME_WE)
+        set (ptx_filename ${ptx_source_we}.ptx)
+
+        add_custom_command (
+            OUTPUT ${kernels_dir}/${ptx_filename}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${kernels_dir}
+            COMMAND ${CUDA_NVCC_EXECUTABLE}
+                "-I${CUDA_INCLUDE_DIR} "
+                "-I${OPTIX_INCLUDE_DIR} "
+                "-I${PROJECT_SOURCE_DIR}/src/appleseed "
+                -m64 --std=c++11 -O3 --use_fast_math --expt-relaxed-constexpr
+                -ptx
+                -arch sm_30
+                ${PROJECT_SOURCE_DIR}/src/appleseed/${ptx_source}
+                -o ${kernels_dir}/${ptx_filename}
+            MAIN_DEPENDENCY ${PROJECT_SOURCE_DIR}/src/appleseed/${ptx_source}
+            DEPENDS ${abs_cuda_headers_sources}
+        )
+
+        list (APPEND appleseed_ptx_files ${kernels_dir}/${ptx_filename})
+    endforeach ()
+
+    # Compile CUDA kernels into the sandbox.
+    foreach (cuda_source ${appleseed_cuda_sources})
+        # Build the .cu destination file name.
+        get_filename_component (cuda_source_we ${cuda_source} NAME_WE)
+        set (fatbin_filename ${cuda_source_we}.fatbin)
+
+        add_custom_command (
+            OUTPUT ${kernels_dir}/${fatbin_filename}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${kernels_dir}
+            COMMAND ${CUDA_NVCC_EXECUTABLE}
+                "-I${CUDA_INCLUDE_DIR} "
+                "-I${PROJECT_SOURCE_DIR}/src/appleseed "
+                -m64 --std=c++11 -O3 --use_fast_math --expt-relaxed-constexpr
+                -fatbin
+                -gencode=arch=compute_30,code=sm_30
+                -gencode=arch=compute_50,code=sm_50
+                -gencode=arch=compute_60,code=sm_60
+                ${PROJECT_SOURCE_DIR}/src/appleseed/${cuda_source}
+                -o ${kernels_dir}/${fatbin_filename}
+            MAIN_DEPENDENCY ${PROJECT_SOURCE_DIR}/src/appleseed/${cuda_source}
+            DEPENDS ${abs_cuda_headers_sources}
+        )
+
+        list (APPEND appleseed_fatbin_files ${kernels_dir}/${fatbin_filename})
+    endforeach ()
+endif ()
+
+
+#--------------------------------------------------------------------------------------------------
 # Target.
 #--------------------------------------------------------------------------------------------------
 
 add_library (appleseed SHARED
     ${appleseed_sources}
+    ${appleseed_ptx_files}
+    ${appleseed_fatbin_files}
 )
 
 set_target_properties (appleseed PROPERTIES FOLDER "Core")
@@ -2163,13 +2331,11 @@ append_custom_preprocessor_definitions (appleseed
 #--------------------------------------------------------------------------------------------------
 
 link_against_platform (appleseed)
-link_against_libpng (appleseed)
 link_against_xercesc (appleseed)
-
 link_against_openexr (appleseed)
 link_against_zlib (appleseed)
 link_against_lz4 (appleseed)
-
+link_against_ocio (appleseed)
 link_against_oiio (appleseed)
 link_against_osl (appleseed)
 
@@ -2177,8 +2343,11 @@ if (WITH_EMBREE)
     link_against_embree (appleseed)
 endif ()
 
-if (WITH_DISNEY_MATERIAL)
-    link_against_seexpr (appleseed)
+if (WITH_GPU)
+    target_link_libraries (appleseed
+        ${OPTIX_LIBRARIES}
+        ${CUDA_CUDA_LIBRARY}
+    )
 endif ()
 
 target_link_libraries (appleseed
@@ -2264,4 +2433,9 @@ else ()
     install (TARGETS appleseed
         DESTINATION lib
     )
+endif ()
+
+if (WITH_GPU)
+    install (FILES ${appleseed_ptx_files} DESTINATION kernels)
+    install (FILES ${appleseed_fatbin_files} DESTINATION kernels)
 endif ()

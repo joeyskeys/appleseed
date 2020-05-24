@@ -35,7 +35,7 @@
 #include "foundation/image/genericimagefilereader.h"
 #include "foundation/image/image.h"
 #include "foundation/image/pixel.h"
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/test.h"
 
 // Boost headers.
@@ -49,7 +49,6 @@
 
 namespace bf = boost::filesystem;
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Resources_Logos)
 {
@@ -135,7 +134,7 @@ TEST_SUITE(Foundation_Resources_Logos)
 
                 color.rgb() = srgb_to_linear_rgb(color.rgb());
 
-                fprintf(file, "%.4ff, %.4ff, %.4ff, %.4ff", color[0], color[1], color[2], color[3]);
+                fprintf(file, "%.9ff, %.9ff, %.9ff, %.9ff", color[0], color[1], color[2], color[3]);
                 ++written_pixels;
             }
         }

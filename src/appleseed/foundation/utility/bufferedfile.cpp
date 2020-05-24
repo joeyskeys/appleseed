@@ -31,7 +31,7 @@
 #include "bufferedfile.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/memory.h"
+#include "foundation/memory/memory.h"
 #include "foundation/utility/otherwise.h"
 
 // LZ4 headers.
@@ -40,8 +40,6 @@
 // Standard headers.
 #include <algorithm>
 #include <cstring>
-
-using namespace std;
 
 namespace foundation
 {
@@ -72,11 +70,11 @@ BufferedFile::~BufferedFile()
 
 namespace
 {
-    string build_mode_string(
+    std::string build_mode_string(
         const BufferedFile::FileType    type,
         const BufferedFile::FileMode    mode)
     {
-        string s;
+        std::string s;
 
         switch (mode)
         {
@@ -118,7 +116,7 @@ bool BufferedFile::open(
     assert(path);
     assert(buffer_size > 0);
 
-    const string mode_string = build_mode_string(type, mode);
+    const std::string mode_string = build_mode_string(type, mode);
 
     m_file = fopen(path, mode_string.c_str());
 
@@ -127,7 +125,7 @@ bool BufferedFile::open(
 
     m_file_mode = mode;
     m_file_index = 0;
-    m_buffer = new uint8[buffer_size];
+    m_buffer = new std::uint8_t[buffer_size];
     m_buffer_size = buffer_size;
     m_buffer_end = mode == ReadMode ? 0 : m_buffer_size;
     m_buffer_index = 0;
@@ -177,7 +175,7 @@ void BufferedFile::fill_buffer()
     assert(m_file_mode == ReadMode);
     assert(m_buffer);
 
-    m_file_index += static_cast<int64>(m_buffer_index);
+    m_file_index += static_cast<std::int64_t>(m_buffer_index);
 
     m_buffer_end = fread(m_buffer, 1, m_buffer_size, m_file);
     m_buffer_index = 0;
@@ -194,7 +192,7 @@ bool BufferedFile::flush_buffer()
 
     const size_t written = fwrite(m_buffer, 1, m_buffer_index, m_file);
 
-    m_file_index += static_cast<int64>(written);
+    m_file_index += static_cast<std::int64_t>(written);
 
     const bool success = written == m_buffer_index;
 
@@ -229,9 +227,9 @@ size_t BufferedFile::read(
         // Copy the contents of the I/O buffer to the output buffer.
         const size_t left = size - bytes;
         const size_t available = m_buffer_end - m_buffer_index;
-        const size_t count = min(left, available);
+        const size_t count = std::min(left, available);
         memcpy(
-            &reinterpret_cast<uint8*>(outbuf)[bytes],
+            &reinterpret_cast<std::uint8_t*>(outbuf)[bytes],
             &m_buffer[m_buffer_index],
             count);
         m_buffer_index += count;
@@ -258,20 +256,20 @@ size_t BufferedFile::read_unbuf(
         // As soon as the I/O buffer is exhausted, switch to unbuffered reading.
         if (m_buffer_index == m_buffer_end)
         {
-            m_file_index += static_cast<int64>(m_buffer_index);
+            m_file_index += static_cast<std::int64_t>(m_buffer_index);
 
             invalidate_buffer();
 
             // Read all remaining data from disk directly into the output buffer.
             const size_t read =
                 fread(
-                    &reinterpret_cast<uint8*>(outbuf)[bytes],
+                    &reinterpret_cast<std::uint8_t*>(outbuf)[bytes],
                     1,
                     size - bytes,
                     m_file);
             bytes += read;
 
-            m_file_index += static_cast<int64>(read);
+            m_file_index += static_cast<std::int64_t>(read);
 
             break;
         }
@@ -279,9 +277,9 @@ size_t BufferedFile::read_unbuf(
         // Copy the contents of the I/O buffer into the output buffer.
         const size_t left = size - bytes;
         const size_t available = m_buffer_end - m_buffer_index;
-        const size_t count = min(left, available);
+        const size_t count = std::min(left, available);
         memcpy(
-            &reinterpret_cast<uint8*>(outbuf)[bytes],
+            &reinterpret_cast<std::uint8_t*>(outbuf)[bytes],
             &m_buffer[m_buffer_index],
             count);
         m_buffer_index += count;
@@ -314,10 +312,10 @@ size_t BufferedFile::write(
         // Copy the contents of the input buffer to the I/O buffer.
         const size_t left = size - bytes;
         const size_t available = m_buffer_end - m_buffer_index;
-        const size_t count = min(left, available);
+        const size_t count = std::min(left, available);
         memcpy(
             &m_buffer[m_buffer_index],
-            &reinterpret_cast<const uint8*>(inbuf)[bytes],
+            &reinterpret_cast<const std::uint8_t*>(inbuf)[bytes],
             count);
         m_buffer_index += count;
         bytes += count;
@@ -348,13 +346,13 @@ size_t BufferedFile::write_unbuf(
             // Write all remaining data directly to disk.
             const size_t written =
                 fwrite(
-                    &reinterpret_cast<const uint8*>(inbuf)[bytes],
+                    &reinterpret_cast<const std::uint8_t*>(inbuf)[bytes],
                     1,
                     size - bytes,
                     m_file);
             bytes += written;
 
-            m_file_index += static_cast<int64>(written);
+            m_file_index += static_cast<std::int64_t>(written);
 
             break;
         }
@@ -362,10 +360,10 @@ size_t BufferedFile::write_unbuf(
         // Copy the contents of the input buffer to the I/O buffer.
         const size_t left = size - bytes;
         const size_t available = m_buffer_end - m_buffer_index;
-        const size_t count = min(left, available);
+        const size_t count = std::min(left, available);
         memcpy(
             &m_buffer[m_buffer_index],
-            &reinterpret_cast<const uint8*>(inbuf)[bytes],
+            &reinterpret_cast<const std::uint8_t*>(inbuf)[bytes],
             count);
         m_buffer_index += count;
         bytes += count;
@@ -376,7 +374,7 @@ size_t BufferedFile::write_unbuf(
 
 namespace
 {
-    int64 portable_fseek(FILE* file, const int64 offset, const int mode)
+    std::int64_t portable_fseek(FILE* file, const std::int64_t offset, const int mode)
     {
 #ifdef _WIN32
         return _fseeki64(file, offset, mode);
@@ -385,7 +383,7 @@ namespace
 #endif
     }
 
-    int64 portable_ftell(FILE* file)
+    std::int64_t portable_ftell(FILE* file)
     {
 #ifdef _WIN32
         return _ftelli64(file);
@@ -396,7 +394,7 @@ namespace
 }
 
 bool BufferedFile::seek(
-    const int64         offset,
+    const std::int64_t  offset,
     const SeekOrigin    origin)
 {
     assert(m_file);
@@ -416,30 +414,30 @@ bool BufferedFile::seek(
     }
     else
     {
-        int64 target_index;
+        std::int64_t target_index;
 
         if (origin == SeekFromBeginning)
             target_index = offset;
         else
         {
             assert(origin == SeekFromCurrent);
-            const int64 current_index = m_file_index + static_cast<int64>(m_buffer_index);
-            target_index = max<int64>(current_index + offset, 0);
+            const std::int64_t current_index = m_file_index + static_cast<std::int64_t>(m_buffer_index);
+            target_index = std::max<std::int64_t>(current_index + offset, 0);
         }
 
         if (target_index >= m_file_index &&
-            target_index <  m_file_index + static_cast<int64>(m_buffer_end))
+            target_index <  m_file_index + static_cast<std::int64_t>(m_buffer_end))
         {
             // Seek within the I/O buffer.
             m_buffer_index = static_cast<size_t>(target_index - m_file_index);
         }
         else
         {
-            int64 current_file_index;
+            std::int64_t current_file_index;
 
             if (m_file_mode == ReadMode)
             {
-                current_file_index = m_file_index + static_cast<int64>(m_buffer_end);
+                current_file_index = m_file_index + static_cast<std::int64_t>(m_buffer_end);
                 invalidate_buffer();
             }
             else
@@ -520,10 +518,10 @@ size_t CompressedReaderAdapter::read(
                 break;
         }
 
-        const size_t copy = min(size, m_buffer_end - m_buffer_index);
+        const size_t copy = std::min(size, m_buffer_end - m_buffer_index);
         memcpy(outbuf, &m_buffer[m_buffer_index], copy);
 
-        outbuf = reinterpret_cast<uint8*>(outbuf) + copy;
+        outbuf = reinterpret_cast<std::uint8_t*>(outbuf) + copy;
         m_buffer_index += copy;
         remaining -= copy;
     }
@@ -541,7 +539,7 @@ namespace
     template <typename T>
     inline size_t read_uint64(BufferedFile& file, T& x)
     {
-        uint64 y;
+        std::uint64_t y;
         const size_t result = file.read(y);
         x = static_cast<T>(y);
         return result;
@@ -591,10 +589,10 @@ void LZ4CompressedWriterAdapter::flush_buffer()
     assert(compressed_buffer_size > 0);
 
     // Write uncompressed size.
-    m_file.write(static_cast<uint64>(m_buffer_index));
+    m_file.write(static_cast<std::uint64_t>(m_buffer_index));
 
     // Write compressed size.
-    m_file.write(static_cast<uint64>(compressed_buffer_size));
+    m_file.write(static_cast<std::uint64_t>(compressed_buffer_size));
 
     // Write compressed data.
     m_file.write(&m_compressed_buffer[0], compressed_buffer_size);

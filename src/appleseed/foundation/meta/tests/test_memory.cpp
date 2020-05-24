@@ -30,8 +30,8 @@
 // appleseed.foundation headers.
 #include "foundation/math/rng/distribution.h"
 #include "foundation/math/rng/mersennetwister.h"
-#include "foundation/utility/alignedallocator.h"
-#include "foundation/utility/memory.h"
+#include "foundation/memory/alignedallocator.h"
+#include "foundation/memory/memory.h"
 #include "foundation/utility/test.h"
 
 // Standard headers.
@@ -40,7 +40,6 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Utility_Memory)
 {
@@ -61,17 +60,17 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(Align_GivenNullPointer_ReturnsNullPointer)
     {
-        EXPECT_EQ((void*)nullptr, align((void*)nullptr, 4));
+        EXPECT_EQ(static_cast<void*>(nullptr), align(static_cast<void*>(nullptr), 4));
     }
 
     TEST_CASE(Align_GivenUnalignedPointer_ReturnsAlignedPointer)
     {
-        EXPECT_EQ((void*)16, align((void*)13, 4));
+        EXPECT_EQ(reinterpret_cast<void*>(16), align(reinterpret_cast<void*>(13), 4));
     }
 
     TEST_CASE(Align_GivenAlignedPointer_ReturnsPointerUnmodified)
     {
-        EXPECT_EQ((void*)16, align((void*)16, 4));
+        EXPECT_EQ(reinterpret_cast<void*>(16), align(reinterpret_cast<void*>(16), 4));
     }
 
     TEST_CASE(Alignment_GivenIntegerZero_ReturnsMaxAlignment)
@@ -91,17 +90,17 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(Alignment_GivenNullPointer_ReturnsMaxAlignment)
     {
-        EXPECT_EQ(32, alignment((void*)nullptr, 32));
+        EXPECT_EQ(32, alignment(static_cast<void*>(nullptr), 32));
     }
 
     TEST_CASE(Alignment_GivenAlignedPointer_ReturnsAlignment)
     {
-        EXPECT_EQ(16, alignment((void*)16, 32));
+        EXPECT_EQ(16, alignment(reinterpret_cast<void*>(16), 32));
     }
 
     TEST_CASE(Alignment_GivenNonAlignedPointer_ReturnsOne)
     {
-        EXPECT_EQ(1, alignment((void*)17, 32));
+        EXPECT_EQ(1, alignment(reinterpret_cast<void*>(17), 32));
     }
 
     TEST_CASE(IsAligned_GivenIntegerZero_ReturnsTrue)
@@ -121,17 +120,17 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(IsAligned_GivenNullPointer_ReturnsTrue)
     {
-        EXPECT_TRUE(is_aligned((void*)nullptr, 32));
+        EXPECT_TRUE(is_aligned(static_cast<void*>(nullptr), 32));
     }
 
     TEST_CASE(IsAligned_GivenAlignedPointer_ReturnsTrue)
     {
-        EXPECT_TRUE(is_aligned((void*)64, 32));
+        EXPECT_TRUE(is_aligned(reinterpret_cast<void*>(64), 32));
     }
 
     TEST_CASE(IsAligned_GivenNonAlignedPointer_ReturnsFalse)
     {
-        EXPECT_FALSE(is_aligned((void*)65, 32));
+        EXPECT_FALSE(is_aligned(reinterpret_cast<void*>(65), 32));
     }
 
 #ifdef APPLESEED_USE_SSE
@@ -162,7 +161,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(EnsureMinimumSize_GivenEmptyVector_ResizesVectorByInsertingDefaultValue)
     {
-        vector<int> v;
+        std::vector<int> v;
 
         ensure_minimum_size(v, 2);
 
@@ -171,7 +170,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(EnsureMinimumSize_GivenEmptyVector_ResizesVectorByInsertingProvidedValue)
     {
-        vector<int> v;
+        std::vector<int> v;
 
         ensure_minimum_size(v, 2, 42);
 
@@ -182,7 +181,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(EnsureMinimumSize_GivenMinimumSizeSmallerThanCurrentVectorSize_DoesNothing)
     {
-        vector<int> v(12);
+        std::vector<int> v(12);
 
         ensure_minimum_size(v, 3);
 
@@ -191,7 +190,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(ClearReleaseMemory_GivenVectorWithThousandElements_ClearsVector)
     {
-        vector<int> v(1000);
+        std::vector<int> v(1000);
 
         clear_release_memory(v);
 
@@ -200,7 +199,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(ClearReleaseMemory_GivenVectorWithThousandElements_ResetsVectorCapacityToDefaultValue)
     {
-        vector<int> v;
+        std::vector<int> v;
         const size_t default_capacity = v.capacity();
 
         v.resize(1000);
@@ -214,7 +213,7 @@ TEST_SUITE(Foundation_Utility_Memory)
     {
         typedef AlignedAllocator<int> Allocator;
 
-        vector<int, AlignedAllocator<int>> v(Allocator(32));
+        std::vector<int, AlignedAllocator<int>> v(Allocator(32));
         const size_t default_capacity = v.capacity();
 
         v.resize(1000);
@@ -226,7 +225,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(ClearKeepMemory_GivenVectorWithThousandElements_ClearsVector)
     {
-        vector<int> v(1000);
+        std::vector<int> v(1000);
 
         clear_keep_memory(v);
 
@@ -235,7 +234,7 @@ TEST_SUITE(Foundation_Utility_Memory)
 
     TEST_CASE(ClearKeepMemory_GivenVectorWithThousandElements_RetainsVectorCapacity)
     {
-        vector<int> v(1000);
+        std::vector<int> v(1000);
 
         const size_t old_capacity = v.capacity();
 

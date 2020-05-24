@@ -41,24 +41,24 @@
 #include "renderer/modeling/input/source.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/fresnel.h"
 #include "foundation/math/microfacet.h"
 #include "foundation/math/qmc.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/gnuplotfile.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
-#include <iomanip>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -68,7 +68,6 @@
 namespace foundation    { class IAbortSwitch; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -86,33 +85,30 @@ namespace
         Vector3f sample(const Vector2f& s) const
         {
             return
-                WardMDF().sample(
+                WardMDF::sample(
                     Vector3f(0.0f, 0.0f, 0.0f),
                     s,
                     m_alpha,
-                    m_alpha,
-                    0.0f);
+                    m_alpha);
         }
 
         float evaluate(const float cos_alpha) const
         {
             return
-                WardMDF().D(
+                WardMDF::D(
                     Vector3f(0.0f, cos_alpha, 0.0f),
                     m_alpha,
-                    m_alpha,
-                    0.0f);
+                    m_alpha);
         }
 
         float evaluate_pdf(const float cos_alpha) const
         {
             return
-                WardMDF().pdf(
+                WardMDF::pdf(
                     Vector3f(0.0f, 0.0f, 0.0f),
                     Vector3f(0.0f, cos_alpha, 0.0f),
                     m_alpha,
-                    m_alpha,
-                    0.0f);
+                    m_alpha);
         }
 
       private:
@@ -188,7 +184,7 @@ namespace
             m_inputs.evaluate_uniforms(&values);
 
             // Construct the Microfacet Distribution Function.
-            m_mdf.reset(new MDFType(max(values.m_roughness, 1.0e-6f)));
+            m_mdf.reset(new MDFType(std::max(values.m_roughness, 1.0e-6f)));
 
             // Precompute the specular albedo curve.
             Spectrum rs(values.m_rs);
@@ -228,7 +224,7 @@ namespace
         {
             InputValues* values = static_cast<InputValues*>(data);
 
-            values->m_roughness = max(values->m_roughness, shading_point.get_ray().m_min_roughness);
+            values->m_roughness = std::max(values->m_roughness, shading_point.get_ray().m_min_roughness);
         }
 
         void sample(
@@ -236,15 +232,17 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
             const InputValues* values = static_cast<const InputValues*>(data);
 
             // Define aliases to match notations in the paper.
-            const Vector3f& V = sample.m_outgoing.get_value();
-            const Vector3f& N = sample.m_shading_basis.get_normal();
-            const float dot_VN = abs(dot(V, N));
+            const Vector3f& V = outgoing.get_value();
+            const Vector3f& N = local_geometry.m_shading_basis.get_normal();
+            const float dot_VN = std::abs(dot(V, N));
 
             // Compute specular albedo for outgoing angle.
             Spectrum specular_albedo_V;
@@ -281,14 +279,14 @@ namespace
 
                 // Compute the incoming direction.
                 const Vector3f wi = sample_hemisphere_cosine(Vector2f(s[0], s[1]));
-                incoming = sample.m_shading_basis.transform_to_parent(wi);
+                incoming = local_geometry.m_shading_basis.transform_to_parent(wi);
 
                 // Compute the halfway vector.
                 H = normalize(incoming + V);
 
                 dot_LN = wi.y;
-                dot_HN = abs(dot(H, N));
-                dot_HV = abs(dot(H, V));
+                dot_HN = std::abs(dot(H, N));
+                dot_HV = std::abs(dot(H, V));
             }
             else
             {
@@ -296,7 +294,7 @@ namespace
 
                 // Sample the microfacet distribution to get an halfway vector H.
                 const Vector3f local_H = m_mdf->sample(Vector2f(s[0], s[1]));
-                H = sample.m_shading_basis.transform_to_parent(local_H);
+                H = local_geometry.m_shading_basis.transform_to_parent(local_H);
 
                 // The incoming direction is the reflection of V around H.
                 dot_HV = dot(H, V);
@@ -304,7 +302,7 @@ namespace
 
                 dot_LN = dot(incoming, N);
                 dot_HN = local_H.y;
-                dot_HV = abs(dot_HV);
+                dot_HV = std::abs(dot_HV);
 
                 // No reflection below the shading surface.
                 if (dot_LN < 0.0f)
@@ -356,7 +354,7 @@ namespace
                 sample.m_value.m_beauty = sample.m_value.m_diffuse;
                 sample.m_value.m_beauty += sample.m_value.m_glossy;
                 sample.m_min_roughness = values->m_roughness;
-                sample.compute_reflected_differentials();
+                sample.compute_glossy_reflected_differentials(local_geometry, values->m_roughness, outgoing);
             }
         }
 
@@ -364,8 +362,7 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -374,16 +371,16 @@ namespace
             // Define aliases to match the notations in the paper.
             const Vector3f& V = outgoing;
             const Vector3f& L = incoming;
-            const Vector3f& N = shading_basis.get_normal();
-            const float dot_VN = abs(dot(V, N));
-            const float dot_LN = abs(dot(L, N));
+            const Vector3f& N = local_geometry.m_shading_basis.get_normal();
+            const float dot_VN = std::abs(dot(V, N));
+            const float dot_LN = std::abs(dot(L, N));
 
             const InputValues* values = static_cast<const InputValues*>(data);
 
             // Compute the halfway vector.
             const Vector3f H = normalize(L + V);
-            const float dot_HN = abs(dot(H, N));
-            const float dot_HL = min(dot(H, L), 1.0f);
+            const float dot_HN = std::abs(dot(H, N));
+            const float dot_HL = std::min(dot(H, L), 1.0f);
 
             // Compute the specular albedo for the outgoing angle.
             Spectrum specular_albedo_V;
@@ -450,8 +447,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override
@@ -459,15 +455,15 @@ namespace
             // Define aliases to match the notations in the paper.
             const Vector3f& V = outgoing;
             const Vector3f& L = incoming;
-            const Vector3f& N = shading_basis.get_normal();
-            const float dot_VN = abs(dot(V, N));
-            const float dot_LN = abs(dot(L, N));
+            const Vector3f& N = local_geometry.m_shading_basis.get_normal();
+            const float dot_VN = std::abs(dot(V, N));
+            const float dot_LN = std::abs(dot(L, N));
 
             const InputValues* values = static_cast<const InputValues*>(data);
 
             // Compute the halfway vector.
             const Vector3f H = normalize(L + V);
-            const float dot_HN = abs(dot(H, N));
+            const float dot_HN = std::abs(dot(H, N));
             const float dot_HL = dot(H, L);
 
             // Compute the specular albedo for the outgoing angle.
@@ -516,27 +512,27 @@ namespace
       private:
         APPLESEED_DECLARE_INPUT_VALUES(InputValues)
         {
-            Spectrum            m_rm;                           // matte reflectance of the substrate
-            float               m_rm_multiplier;                // matte reflectance multiplier
-            Spectrum            m_rs;                           // specular reflectance at normal incidence
-            float               m_rs_multiplier;                // specular reflectance multiplier
-            float               m_roughness;                    // technically, root-mean-square of the microfacets slopes
+            Spectrum                 m_rm;                           // matte reflectance of the substrate
+            float                    m_rm_multiplier;                // matte reflectance multiplier
+            Spectrum                 m_rs;                           // specular reflectance at normal incidence
+            float                    m_rs_multiplier;                // specular reflectance multiplier
+            float                    m_roughness;                    // technically, root-mean-square of the microfacets slopes
         };
 
         typedef WardMDFAdapter MDFType;
 
-        unique_ptr<MDFType>     m_mdf;                          // Microfacet Distribution Function
-        Spectrum                m_a_spec[AlbedoTableSize];      // albedo of the specular component as V varies
-        Spectrum                m_s;                            // normalization constant for the matte component
+        std::unique_ptr<MDFType>     m_mdf;                          // Microfacet Distribution Function
+        Spectrum                     m_a_spec[AlbedoTableSize];      // albedo of the specular component as V varies
+        Spectrum                     m_s;                            // normalization constant for the matte component
 
         // Evaluate the specular component of the BRDF (equation 3).
         template <typename MDF>
         static void evaluate_fr_spec(
-            const MDF&          mdf,
-            const Spectrum&     rs,
-            const float         dot_HL,     // cos_beta in the paper
-            const float         dot_HN,
-            Spectrum&           fr_spec)
+            const MDF&               mdf,
+            const Spectrum&          rs,
+            const float              dot_HL,     // cos_beta in the paper
+            const float              dot_HN,
+            Spectrum&                fr_spec)
         {
             assert(dot_HL >  0.0f);
             assert(dot_HN >= 0.0f);
@@ -556,7 +552,7 @@ namespace
             {
                 // Compute an outgoing direction V in the XY plane.
                 const float cos_theta = static_cast<float>(i) / (AlbedoTableSize - 1);
-                const float sin_theta = sqrt(1.0f - cos_theta * cos_theta);
+                const float sin_theta = std::sqrt(1.0f - cos_theta * cos_theta);
                 const Vector3f V(sin_theta, cos_theta, 0.0f);
 
                 // Compute the albedo for this outgoing direction.
@@ -630,7 +626,7 @@ namespace
             for (size_t i = 0; i < AlbedoTableSize; ++i)
             {
                 const float cos_theta = static_cast<float>(i) / (AlbedoTableSize - 1);
-                const float sin_theta = sqrt(1.0f - cos_theta * cos_theta);
+                const float sin_theta = std::sqrt(1.0f - cos_theta * cos_theta);
 
                 Spectrum sample = a_spec[i];
                 sample *= cos_theta * sin_theta;
@@ -691,7 +687,7 @@ namespace
 
         template <typename MDF>
         static void generate_specular_albedo_plot_data(
-            const string&       mdf_name,
+            const std::string&  mdf_name,
             const float         m,
             const MDF&          mdf,
             const Spectrum&     rs)
@@ -699,23 +695,23 @@ namespace
             Spectrum a_spec[AlbedoTableSize];
             compute_specular_albedo(mdf, rs, a_spec);
 
-            vector<Vector2f> tabulated_albedos(AlbedoTableSize);
+            std::vector<Vector2f> tabulated_albedos(AlbedoTableSize);
 
             for (size_t i = 0; i < AlbedoTableSize; ++i)
             {
                 const float cos_angle = static_cast<float>(i) / (AlbedoTableSize - 1);
-                const float angle = acos(cos_angle);
+                const float angle = std::acos(cos_angle);
                 const float albedo = average_value(a_spec[i]);
                 tabulated_albedos[i] = Vector2f(angle, albedo);
             }
 
             const size_t PointCount = 256;
-            vector<Vector2f> reconstructed_albedos(PointCount);
+            std::vector<Vector2f> reconstructed_albedos(PointCount);
 
             for (size_t i = 0; i < PointCount; ++i)
             {
                 const float cos_angle = static_cast<float>(i) / (PointCount - 1);
-                const float angle = acos(cos_angle);
+                const float angle = std::acos(cos_angle);
 
                 Spectrum albedo_sample;
                 evaluate_a_spec(a_spec, cos_angle, albedo_sample);
@@ -741,7 +737,7 @@ namespace
                 .set_style("lines")
                 .set_color("blue");
 
-            stringstream filename;
+            std::stringstream filename;
             filename << "kelemen_albedo";
             filename << "_" << lower_case(mdf_name);
             filename << "_" << replace(to_string(m), ".", "_");

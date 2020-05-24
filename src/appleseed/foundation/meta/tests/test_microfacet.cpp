@@ -28,6 +28,7 @@
 //
 
 // appleseed.foundation headers.
+#include "foundation/math/fp.h"
 #include "foundation/math/microfacet.h"
 #include "foundation/math/qmc.h"
 #include "foundation/math/sampling/mappings.h"
@@ -36,21 +37,78 @@
 #include "foundation/utility/test.h"
 
 // Standard headers.
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Math_Microfacet)
 {
+    class StdMDFAdapter
+    {
+      public:
+        explicit StdMDFAdapter(const float gamma)
+          : m_gamma(gamma)
+        {
+        }
+
+        float D(
+            const Vector3f&     m,
+            const float         alpha_x,
+            const float         alpha_y) const
+        {
+            return StdMDF::D(m, alpha_x, alpha_y, m_gamma);
+        }
+
+        float G(
+            const Vector3f&     wi,
+            const Vector3f&     wo,
+            const Vector3f&     m,
+            const float         alpha_x,
+            const float         alpha_y) const
+        {
+            return StdMDF::G(wi, wo, m, alpha_x, alpha_y, m_gamma);
+        }
+
+        float G1(
+            const Vector3f&     v,
+            const Vector3f&     m,
+            const float         alpha_x,
+            const float         alpha_y) const
+        {
+            return StdMDF::G1(v, m, alpha_x, alpha_y, m_gamma);
+        }
+
+        Vector3f sample(
+            const Vector3f&     v,
+            const Vector2f&     s,
+            const float         alpha_x,
+            const float         alpha_y) const
+        {
+            return StdMDF::sample(v, s, alpha_x, alpha_y, m_gamma);
+        }
+
+        float pdf(
+            const Vector3f&     v,
+            const Vector3f&     m,
+            const float         alpha_x,
+            const float         alpha_y) const
+        {
+            return StdMDF::pdf(v, m, alpha_x, alpha_y, m_gamma);
+        }
+
+      private:
+        const float m_gamma;
+    };
+
     template <typename MDF>
     bool is_positive(
         const MDF&    mdf,
         const float   alpha_x,
         const float   alpha_y,
-        const size_t  sample_count,
-        const float   gamma = 0.0f)
+        const size_t  sample_count)
     {
         for (size_t i = 0; i < sample_count; ++i)
         {
@@ -58,7 +116,7 @@ TEST_SUITE(Foundation_Math_Microfacet)
             const Vector2f s = hammersley_sequence<float, 2>(Bases, sample_count, i);
 
             const Vector3f h = sample_hemisphere_uniform(s);
-            const float value = mdf.D(h, alpha_x, alpha_y, gamma);
+            const float value = mdf.D(h, alpha_x, alpha_y);
 
             if (value < 0.0f)
                 return false;
@@ -71,18 +129,17 @@ TEST_SUITE(Foundation_Math_Microfacet)
     float integrate(
         const MDF&    mdf,
         const float   alpha,
-        const size_t  sample_count,
-        const float   gamma = 0.0f)
+        const size_t  sample_count)
     {
         float integral = 0.0f;
 
         for (size_t i = 0; i < sample_count; ++i)
         {
             const float theta = radical_inverse_base2<float>(i) * HalfPi<float>();
-            const Vector3f h(0.0f, cos(theta), 0.0f);
-            const float value = mdf.D(h, alpha, alpha, gamma);
+            const Vector3f h(0.0f, std::cos(theta), 0.0f);
+            const float value = mdf.D(h, alpha, alpha);
 
-            integral += value * h.y * sin(theta);
+            integral += value * h.y * std::sin(theta);
         }
 
         integral *= HalfPi<float>() / sample_count;     // integration over theta
@@ -90,6 +147,7 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
         return integral;
     }
+
 
     //
     // Weak white furnace test.
@@ -110,26 +168,24 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     template <typename MDF>
     void weak_white_furnace_test(
-        size_t                      num_runs,
+        const MDF&                  mdf,
+        const size_t                num_runs,
         const float                 alpha_x,
         const float                 alpha_y,
-        const float                 gamma,
         const float                 angle_step,
         WeakWhiteFurnaceTestResult& result)
     {
-        result.m_min_G1 =  numeric_limits<float>::max();
-        result.m_max_G1 = -numeric_limits<float>::max();
-        result.m_min_result =  numeric_limits<float>::max();
-        result.m_max_result = -numeric_limits<float>::max();
-
-        MDF mdf;
+        result.m_min_G1 =  std::numeric_limits<float>::max();
+        result.m_max_G1 = -std::numeric_limits<float>::max();
+        result.m_min_result =  std::numeric_limits<float>::max();
+        result.m_max_result = -std::numeric_limits<float>::max();
 
         for (size_t i = 0; i < num_runs; ++i)
         {
             static const size_t Bases[] = { 2 };
             const Vector2f s = hammersley_sequence<float, 2>(Bases, num_runs, i);
             const Vector3f v = sample_hemisphere_uniform(s);
-            const float G1 = mdf.G1(v, Vector3f(0.0f, 1.0, 0.0f), alpha_x, alpha_y, gamma);
+            const float G1 = mdf.G1(v, Vector3f(0.0f, 1.0, 0.0f), alpha_x, alpha_y);
 
             result.m_min_G1 = std::min(result.m_min_G1, G1);
             result.m_max_G1 = std::max(result.m_max_G1, G1);
@@ -158,7 +214,7 @@ TEST_SUITE(Foundation_Math_Microfacet)
                     const Vector3f h = normalize(v + l);
 
                     if (h.y > 0.0f)
-                        integral += sin_theta * mdf.D(h, alpha_x, alpha_y, gamma) * G1 / cos_thetha_o_4;
+                        integral += sin_theta * mdf.D(h, alpha_x, alpha_y) * G1 / cos_thetha_o_4;
                 }
             }
 
@@ -170,10 +226,13 @@ TEST_SUITE(Foundation_Math_Microfacet)
         }
     }
 
-#define EXPECT_WEAK_WHITE_FURNACE_PASS(result) \
-    EXPECT_NEQ(result.m_min_G1, result.m_max_G1); \
-    EXPECT_FEQ_EPS(1.0f, result.m_min_result, WeakWhiteFurnaceEps); \
-    EXPECT_FEQ_EPS(1.0f, result.m_max_result, WeakWhiteFurnaceEps);
+#define EXPECT_WEAK_WHITE_FURNACE_PASS(result)                              \
+    do                                                                      \
+    {                                                                       \
+        EXPECT_NEQ(result.m_min_G1, result.m_max_G1);                       \
+        EXPECT_FEQ_EPS(1.0f, result.m_min_result, WeakWhiteFurnaceEps);     \
+        EXPECT_FEQ_EPS(1.0f, result.m_max_result, WeakWhiteFurnaceEps);     \
+    } while (false)
 
 
     //
@@ -194,23 +253,21 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(BlinnMDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const BlinnMDF mdf;
+        const BlinnMDF mdf = {};
 
         EXPECT_TRUE(is_positive(mdf, 10.0f, 10.0f, PositivityTestSampleCount));
     }
 
     TEST_CASE(BlinnMDF_Evaluate_GivenCosThetaIsZero_ReturnsZero)
     {
-        const BlinnMDF mdf;
-
-        const float limit = mdf.D(Vector3f(0.0f), 10.0f, 10.0f, 0.0f);
+        const float limit = BlinnMDF::D(Vector3f(0.0f), 10.0f, 10.0f);
 
         EXPECT_FEQ(0.0f, limit);
     }
 
     TEST_CASE(BlinnMDF_Integral_EqualsOne)
     {
-        const BlinnMDF mdf;
+        const BlinnMDF mdf = {};
 
         const float integral = integrate(mdf, 10.0f, IntegrationSampleCount);
 
@@ -224,23 +281,21 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(BeckmannMDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const BeckmannMDF mdf;
+        const BeckmannMDF mdf = {};
 
         EXPECT_TRUE(is_positive(mdf, 0.5f, 0.5f, PositivityTestSampleCount));
     }
 
     TEST_CASE(BeckmannMDF_Evaluate_GivenCosThetaIsZero_ReturnsZero)
     {
-        const BeckmannMDF mdf;
-
-        const float limit = mdf.D(Vector3f(0.0f), 0.5f, 0.5f, 0.0f);
+        const float limit = BeckmannMDF::D(Vector3f(0.0f), 0.5f, 0.5f);
 
         EXPECT_FEQ(0.0f, limit);
     }
 
     TEST_CASE(BeckmannMDF_Integral_EqualsOne)
     {
-        const BeckmannMDF mdf;
+        const BeckmannMDF mdf = {};
 
         const float integral = integrate(mdf, 0.5f, IntegrationSampleCount);
 
@@ -250,29 +305,29 @@ TEST_SUITE(Foundation_Math_Microfacet)
     TEST_CASE(BeckmannMDF_Isotropic_WeakWhiteFurnace)
     {
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<BeckmannMDF>(
+        weak_white_furnace_test(
+            BeckmannMDF(),
             WeakWhiteFurnaceRuns,
             0.6f,
             0.6f,
-            0.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
 
     TEST_CASE(BeckmannMDF_Anisotropic_WeakWhiteFurnace)
     {
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<BeckmannMDF>(
+        weak_white_furnace_test(
+            BeckmannMDF(),
             WeakWhiteFurnaceRuns,
             0.25f,
             0.5f,
-            0.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
 
 
@@ -282,7 +337,7 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(GGXMDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const GGXMDF mdf;
+        const GGXMDF mdf = {};
 
         EXPECT_TRUE(is_positive(mdf, 0.5f, 0.5f, PositivityTestSampleCount));
     }
@@ -290,17 +345,16 @@ TEST_SUITE(Foundation_Math_Microfacet)
     TEST_CASE(GGXMDF_Evaluate_GivenCosThetaIsZero_ReturnsLimitValue)
     {
         const float AlphaG = 0.5f;
-        const GGXMDF mdf;
         const float ExpectedLimit = AlphaG * AlphaG * RcpPi<float>();
 
-        const float limit = mdf.D(Vector3f(0.0f), AlphaG, AlphaG, 0.0f);
+        const float limit = GGXMDF::D(Vector3f(0.0f), AlphaG, AlphaG);
 
         EXPECT_FEQ(ExpectedLimit, limit);
     }
 
     TEST_CASE(GGXMDF_Integral_EqualsOne)
     {
-        const GGXMDF mdf;
+        const GGXMDF mdf = {};
 
         const float integral = integrate(mdf, 0.5f, IntegrationSampleCount);
 
@@ -310,29 +364,29 @@ TEST_SUITE(Foundation_Math_Microfacet)
     TEST_CASE(GGXMDF_Isotropic_WeakWhiteFurnace)
     {
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<GGXMDF>(
+        weak_white_furnace_test(
+            GGXMDF(),
             WeakWhiteFurnaceRuns,
             0.35f,
             0.35f,
-            0.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
 
     TEST_CASE(GGXMDF_Anisotropic_WeakWhiteFurnace)
     {
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<GGXMDF>(
+        weak_white_furnace_test(
+            GGXMDF(),
             WeakWhiteFurnaceRuns,
             0.25f,
             0.5f,
-            0.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
 
 
@@ -342,16 +396,14 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(WardMDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const WardMDF mdf;
+        const WardMDF mdf = {};
 
         EXPECT_TRUE(is_positive(mdf, 0.5f, 0.5f, PositivityTestSampleCount));
     }
 
     TEST_CASE(WardMDF_Evaluate_GivenCosThetaIsZero_ReturnsZero)
     {
-        const WardMDF mdf;
-
-        const float limit = mdf.D(Vector3f(0.0f), 0.5f, 0.5f, 0.0f);
+        const float limit = WardMDF::D(Vector3f(0.0f), 0.5f, 0.5f);
 
         EXPECT_FEQ(0.0f, limit);
     }
@@ -363,14 +415,14 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(GTR1MDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const GTR1MDF mdf;
+        const GTR1MDF mdf = {};
 
         EXPECT_TRUE(is_positive(mdf, 10.0f, 10.0f, PositivityTestSampleCount));
     }
 
     TEST_CASE(GTR1MDF_Integral_EqualsOne)
     {
-        const GTR1MDF mdf;
+        const GTR1MDF mdf = {};
 
         const float integral = integrate(mdf, 10.0f, IntegrationSampleCount);
 
@@ -380,16 +432,17 @@ TEST_SUITE(Foundation_Math_Microfacet)
     TEST_CASE(GTR1MDF_Isotropic_WeakWhiteFurnace)
     {
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<GTR1MDF>(
+        weak_white_furnace_test(
+            GTR1MDF(),
             WeakWhiteFurnaceRuns,
             0.21f,
             0.21f,
-            0.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
+
 
     //
     // STD MDF.
@@ -397,62 +450,55 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(StdMDF_Evaluate_ReturnsNonNegativeValues)
     {
-        const StdMDF mdf;
-
-        EXPECT_TRUE(is_positive(mdf, 0.5f, 0.5f, PositivityTestSampleCount, 2.0f));
+        const StdMDFAdapter mdf(2.0f);
+        EXPECT_TRUE(is_positive(mdf, 0.5f, 0.5f, PositivityTestSampleCount));
     }
 
     TEST_CASE(StdMDF_Evaluate_GivenCosThetaIsZero_ReturnsZero)
     {
-        const StdMDF mdf;
-
-        const float limit = mdf.D(Vector3f(0.0f), 0.5f, 0.5f, 2.0f);
+        const float limit = StdMDF::D(Vector3f(0.0f), 0.5f, 0.5f, 2.0f);
 
         EXPECT_FEQ(0.0f, limit);
     }
 
     TEST_CASE(StdMDF_Integral_EqualsOne)
     {
-        const StdMDF mdf;
-
-        const float integral = integrate(mdf, 0.5f, IntegrationSampleCount, 2.0);
+        const StdMDFAdapter mdf(2.0f);
+        const float integral = integrate(mdf, 0.5f, IntegrationSampleCount);
 
         EXPECT_FEQ_EPS(1.0f, integral, IntegrationEps);
     }
 
     TEST_CASE(StdMDF_2_GGXMDF_G1_comparison)
     {
-        const StdMDF std;
-        const GGXMDF ggx;
+        const size_t SampleCount = 128;
 
-        const size_t num_sample = 128;
-        for (size_t i = 0; i < num_sample; ++i)
+        for (size_t i = 0; i < SampleCount; ++i)
         {
             static const size_t Bases[] = { 2 };
-            const Vector2f s = hammersley_sequence<float, 2>(Bases, num_sample, i);
+            const Vector2f s = hammersley_sequence<float, 2>(Bases, SampleCount, i);
             const Vector3f v = sample_hemisphere_uniform(s);
-            const float std_G1 = std.G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f, 2.0f);
-            const float ggx_G1 = ggx.G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f, 2.0f);
+            const float std_G1 = StdMDF::G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f, 2.0f);
+            const float ggx_G1 = GGXMDF::G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f);
             EXPECT_FEQ_EPS(std_G1, ggx_G1, 0.01f);
         }
     }
 
     TEST_CASE(StdMDF_lambda_overflow)
     {
-        const StdMDF std;
+        const float GammaMax = 40.0f;
+        const float GammaStep = 2.0f;
+        const size_t SampleCount = 128;
 
-        const float gamma_max = 40.0f;
-        const float gamma_step = 2.0f;
-        const size_t num_sample = 128;
-        for (float i = 2.0f; i <= gamma_max; i += gamma_step)
+        for (float i = 2.0f; i <= GammaMax; i += GammaStep)
         {
-            for (size_t j = 0; j < num_sample; ++j)
+            for (size_t j = 0; j < SampleCount; ++j)
             {
                 static const size_t Bases[] = { 2 };
-                const Vector2f s = hammersley_sequence<float, 2>(Bases, num_sample, j);
+                const Vector2f s = hammersley_sequence<float, 2>(Bases, SampleCount, j);
                 const Vector3f v = sample_hemisphere_uniform(s);
-                const float std_G1 = std.G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f, i);
-                EXPECT_TRUE(foundation::FP<float>::is_finite(std_G1)); // check that G1 doesn't produce NaN
+                const float std_G1 = StdMDF::G1(v, Vector3f(0.0f, 1.0f, 0.0f), 0.5f, 0.5f, i);
+                EXPECT_TRUE(FP<float>::is_finite(std_G1));  // check that G1 doesn't produce NaN
             }
         }
 
@@ -460,36 +506,36 @@ TEST_SUITE(Foundation_Math_Microfacet)
 
     TEST_CASE(StdMDF_D_overflow)
     {
-        const StdMDF std;
+        const float GammaMax = 40.0f;
+        const float GammaStep = 2.0f;
+        const size_t SampleCount = 128;
 
-        const float gamma_max = 40.0f;
-        const float gamma_step = 2.0f;
-        const size_t num_sample = 128;
-        for (float i = 2.0f; i <= gamma_max; i += gamma_step)
+        for (float i = 2.0f; i <= GammaMax; i += GammaStep)
         {
-            for (size_t j = 0; j < num_sample; ++j)
+            for (size_t j = 0; j < SampleCount; ++j)
             {
                 static const size_t Bases[] = { 2 };
-                const Vector2f s = hammersley_sequence<float, 2>(Bases, num_sample, j);
+                const Vector2f s = hammersley_sequence<float, 2>(Bases, SampleCount, j);
                 const Vector3f h = sample_hemisphere_uniform(s);
-                const float std_D = std.D(h, 0.5f, 0.5f, i);
-                EXPECT_TRUE(foundation::FP<float>::is_finite(std_D)); // check that D doesn't produce NaN
+                const float std_D = StdMDF::D(h, 0.5f, 0.5f, i);
+                EXPECT_TRUE(FP<float>::is_finite(std_D));   // check that D doesn't produce NaN
             }
         }
     }
 
     TEST_CASE(StdMDF_Isotropic_WeakWhiteFurnace)
     {
+        const StdMDFAdapter mdf(2.0f);
         WeakWhiteFurnaceTestResult result;
-        weak_white_furnace_test<StdMDF>(
+        weak_white_furnace_test(
+            mdf,
             WeakWhiteFurnaceRuns,
             0.6f,
             0.6f,
-            2.0f,
             WeakWhiteFurnaceAngleStep,
             result);
 
-        EXPECT_WEAK_WHITE_FURNACE_PASS(result)
+        EXPECT_WEAK_WHITE_FURNACE_PASS(result);
     }
 
 #undef EXPECT_WEAK_WHITE_FURNACE_PASS

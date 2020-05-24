@@ -34,8 +34,8 @@
 #include "renderer/api/shadergroup.h"
 
 // appleseed.foundation headers.
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/platform/python.h"
-#include "foundation/utility/autoreleaseptr.h"
 
 // Standard headers.
 #include <string>
@@ -43,7 +43,6 @@
 namespace bpy = boost::python;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace
 {
@@ -52,7 +51,7 @@ namespace
         return ShaderCompilerFactory::create(stdosl_path);
     }
 
-    bpy::object compile_buffer(const ShaderCompiler* compiler, const string& buffer)
+    bpy::object compile_buffer(const ShaderCompiler* compiler, const std::string& buffer)
     {
         APIString result;
 

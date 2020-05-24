@@ -38,12 +38,12 @@
 #include "foundation/math/scalar.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
 #include "foundation/utility/poison.h"
 
 // Standard headers.
 #include <array>
 #include <cassert>
+#include <cstdint>
 
 // Forward declarations.
 namespace renderer  { class Material; }
@@ -62,10 +62,8 @@ class ShadingRay
 {
   public:
     // Types.
-    typedef foundation::Vector3d    VectorType;
-    typedef foundation::Ray3d       RayType;
     typedef foundation::RayInfo3d   RayInfoType;
-    typedef foundation::uint16      DepthType;
+    typedef std::uint16_t           DepthType;
 
     class Time
     {
@@ -98,13 +96,15 @@ class ShadingRay
     };
 
     // Public members, in an order that optimizes packing.
-    RayType                         m_rx;
-    RayType                         m_ry;
+    VectorType                      m_rx_org;
+    VectorType                      m_rx_dir;
+    VectorType                      m_ry_org;
+    VectorType                      m_ry_dir;
     Time                            m_time;
     Medium                          m_media[MaxMediumCount];        // always sorted from highest to lowest priority
     VisibilityFlags::Type           m_flags;
     DepthType                       m_depth;
-    foundation::uint8               m_medium_count;
+    std::uint8_t                    m_medium_count;
     bool                            m_has_differentials;
     float                           m_min_roughness;
 
@@ -124,6 +124,9 @@ class ShadingRay
         const Time&                 time,
         const VisibilityFlags::Type flags,
         const DepthType             depth);
+
+    // Scale ray differentials by a factor s.
+    void scale_differentials(const ValueType s);
 
     // Copy all media from the source ray.
     void copy_media_from(const ShadingRay& source);
@@ -259,20 +262,22 @@ namespace foundation
       public:
         static void do_poison(renderer::ShadingRay& ray)
         {
-            poison(ray.m_rx);
-            poison(ray.m_ry);
-            poison(ray.m_time.m_absolute);
-            poison(ray.m_time.m_normalized);
+            always_poison(ray.m_rx_org);
+            always_poison(ray.m_rx_dir);
+            always_poison(ray.m_ry_org);
+            always_poison(ray.m_ry_dir);
+            always_poison(ray.m_time.m_absolute);
+            always_poison(ray.m_time.m_normalized);
 
             for (size_t i = 0; i < renderer::ShadingRay::MaxMediumCount; ++i)
             {
-                poison(ray.m_media[i].m_object_instance);
-                poison(ray.m_media[i].m_material);
-                poison(ray.m_media[i].m_ior);
+                always_poison(ray.m_media[i].m_object_instance);
+                always_poison(ray.m_media[i].m_material);
+                always_poison(ray.m_media[i].m_ior);
             }
 
-            poison(ray.m_flags);
-            poison(ray.m_depth);
+            always_poison(ray.m_flags);
+            always_poison(ray.m_depth);
 
             // Don't poison m_medium_count or m_has_differentials since
             // they are properly initialized by the default constructor.

@@ -32,12 +32,10 @@
 // appleseed.foundation headers.
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/image.h"
-#include "foundation/platform/types.h"
 
 // Standard headers.
 #include <algorithm>
-
-using namespace std;
+#include <cstdint>
 
 namespace foundation
 {
@@ -56,10 +54,10 @@ void Drawing::draw_filled_rect(
     const int w = static_cast<int>(props.m_canvas_width);
     const int h = static_cast<int>(props.m_canvas_height);
 
-    const size_t x0 = static_cast<size_t>(max(from.x, 0));
-    const size_t y0 = static_cast<size_t>(max(from.y, 0));
-    const size_t x1 = static_cast<size_t>(min(to.x, w - 1));
-    const size_t y1 = static_cast<size_t>(min(to.y, h - 1));
+    const size_t x0 = static_cast<size_t>(std::max(from.x, 0));
+    const size_t y0 = static_cast<size_t>(std::max(from.y, 0));
+    const size_t x1 = static_cast<size_t>(std::min(to.x, w - 1));
+    const size_t y1 = static_cast<size_t>(std::min(to.y, h - 1));
 
     const Color4f color_premult = color.premultiplied();
 
@@ -82,7 +80,7 @@ void Drawing::draw_dot(
     const Vector2d&     position,
     const Color4f&      color)
 {
-    static const uint8 DotAlphaMask[16] =
+    static const std::uint8_t DotAlphaMask[16] =
     {
          24, 171, 178,  48,
         159, 255, 255, 207,
@@ -151,7 +149,7 @@ void Drawing::blit_bitmap(
 
             if (ix >= 0 && iy >= 0 && ix < image_width && iy < image_height)
             {
-                const uint8* pixel = static_cast<const uint8*>(bitmap) + (y * bitmap_width + x) * pixel_size;
+                const std::uint8_t* pixel = static_cast<const std::uint8_t*>(bitmap) + (y * bitmap_width + x) * pixel_size;
 
                 Color4f color_premult(0.0f);
                 Pixel::convert_from_format<float>(

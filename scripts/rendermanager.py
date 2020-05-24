@@ -40,6 +40,8 @@ import time
 import traceback
 import xml.dom.minidom as xml
 
+from utils import print_runtime_details
+
 
 # -------------------------------------------------------------------------------------------------
 # Constants.
@@ -530,6 +532,8 @@ def main():
                         help="directory where the rendered frames should be stored")
     args = parser.parse_args()
 
+    print_runtime_details("rendermanager", VERSION, os.path.realpath(__file__))
+
     if args.max_size is None:
         args.max_size = 2 ** 40                 # default to 1 terabyte
     else:
@@ -563,5 +567,6 @@ def main():
 
     log.info("exiting...")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

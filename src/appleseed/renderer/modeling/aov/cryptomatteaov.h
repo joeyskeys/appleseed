@@ -26,15 +26,17 @@
 // THE SOFTWARE.
 //
 
-#ifndef APPLESEED_RENDERER_MODELING_AOV_CRYPTOMATTEAOV_H
-#define APPLESEED_RENDERER_MODELING_AOV_CRYPTOMATTEAOV_H
+#pragma once
 
 // appleseed.renderer headers.
 #include "renderer/modeling/aov/aov.h"
 #include "renderer/modeling/aov/iaovfactory.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
+
+// appleseed.main headers.
+#include "main/dllsymbol.h"
 
 // Standard headers.
 #include <cstddef>
@@ -53,7 +55,7 @@ namespace renderer
 // Cryptomatte AOV.
 //
 
-class CryptomatteAOV
+class APPLESEED_DLLSYMBOL CryptomatteAOV
   : public AOV
 {
   public:
@@ -74,6 +76,8 @@ class CryptomatteAOV
     const char** get_channel_names() const override;
 
     bool has_color_data() const override;
+
+    foundation::Image* get_cryptomatte_image() const;
 
     void create_image(
         const size_t    canvas_width,
@@ -106,27 +110,26 @@ class APPLESEED_DLLSYMBOL CryptomatteAOVFactory
   : public IAOVFactory
 {
   public:
-      CryptomatteAOVFactory(const CryptomatteAOV::CryptomatteType aov_type);
+    CryptomatteAOVFactory(const CryptomatteAOV::CryptomatteType aov_type);
 
-      // Delete this instance.
-      void release() override;
+    // Delete this instance.
+    void release() override;
 
-      // Return a string identifying this AOV model.
-      const char* get_model() const override;
+    // Return a string identifying this AOV model.
+    const char* get_model() const override;
 
-      // Return metadata for this AOV model.
-      foundation::Dictionary get_model_metadata() const override;
+    // Return metadata for this AOV model.
+    foundation::Dictionary get_model_metadata() const override;
 
-      // Return metadata for the inputs of this AOV model.
-      foundation::DictionaryArray get_input_metadata() const override;
+    // Return metadata for the inputs of this AOV model.
+    foundation::DictionaryArray get_input_metadata() const override;
 
     // Create a new AOV instance.
-      foundation::auto_release_ptr<AOV> create(const ParamArray& params) const override;
+    foundation::auto_release_ptr<AOV> create(const ParamArray& params) const override;
 
   private:
-      CryptomatteAOV::CryptomatteType m_aov_type;
+    CryptomatteAOV::CryptomatteType m_aov_type;
 };
 
 }       // namespace renderer
 
-#endif  // !APPLESEED_RENDERER_MODELING_AOV_CRYPTOMATTEAOV_H

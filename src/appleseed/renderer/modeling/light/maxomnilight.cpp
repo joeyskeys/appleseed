@@ -36,12 +36,12 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/distance.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <cmath>
@@ -53,7 +53,6 @@ namespace renderer      { class Project; }
 namespace renderer      { class ShadingContext; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -151,7 +150,7 @@ namespace
         {
             return
                 autodesk_max_decay(
-                    sqrt(static_cast<float>(square_distance(target, position))),
+                    std::sqrt(static_cast<float>(square_distance(target, position))),
                     m_decay_start,
                     m_decay_exponent);
         }

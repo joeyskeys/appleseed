@@ -28,57 +28,59 @@
 
 // appleseed.foundation headers.
 #include "foundation/platform/arch.h"
-#include "foundation/platform/types.h"
 #include "foundation/utility/poison.h"
 #include "foundation/utility/test.h"
 
+// Standard headers.
+#include <cstdint>
+
 using namespace foundation;
 
-#ifdef DEBUG
+#ifdef APPLESEED_DEBUG
 
-TEST_SUITE(Foundation_Utility_Poison)
+TEST_SUITE(Foundation_Utility_Debug_Poison)
 {
-    TEST_CASE(Poison_Int8)
+    TEST_CASE(Debug_Poison_Int8)
     {
-        int8 x = 0;
+        std::int8_t x = 0;
 
-        poison(x);
+        debug_poison(x);
 
-        EXPECT_EQ(int8(0xADU), x);
+        EXPECT_EQ(std::int8_t(0xADU), x);
     }
 
-    TEST_CASE(Poison_UInt8)
+    TEST_CASE(Debug_Poison_UInt8)
     {
-        uint8 x = 0;
+        std::uint8_t x = 0;
 
-        poison(x);
+        debug_poison(x);
 
         EXPECT_EQ(0xADU, x);
     }
 
-    TEST_CASE(Poison_Int32)
+    TEST_CASE(Debug_Poison_Int32)
     {
-        int32 x = 0;
+        std::int32_t x = 0;
 
-        poison(x);
+        debug_poison(x);
 
-        EXPECT_EQ(int32(0xADADADADU), x);
+        EXPECT_EQ(std::int32_t(0xADADADADU), x);
     }
 
-    TEST_CASE(Poison_UInt32)
+    TEST_CASE(Debug_Poison_UInt32)
     {
-        uint32 x = 0;
+        std::uint32_t x = 0;
 
-        poison(x);
+        debug_poison(x);
 
         EXPECT_EQ(0xADADADADU, x);
     }
 
-    TEST_CASE(Poison_VoidPointer)
+    TEST_CASE(Debug_Poison_VoidPointer)
     {
         void* p = nullptr;
 
-        poison(p);
+        debug_poison(p);
 
 #ifdef APPLESEED_ARCH32
         EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFu), p);
@@ -87,11 +89,11 @@ TEST_SUITE(Foundation_Utility_Poison)
 #endif
     }
 
-    TEST_CASE(Poison_IntPointer)
+    TEST_CASE(Debug_Poison_IntPointer)
     {
         int* p = nullptr;
 
-        poison(p);
+        debug_poison(p);
 
 #ifdef APPLESEED_ARCH32
         EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFu), p);
@@ -100,29 +102,29 @@ TEST_SUITE(Foundation_Utility_Poison)
 #endif
     }
 
-    TEST_CASE(Poison_Float)
+    TEST_CASE(Debug_Poison_Float)
     {
         float x = 0.0f;
 
-        poison(x);
+        debug_poison(x);
 
         EXPECT_FALSE(x == x);
     }
 
-    TEST_CASE(Poison_Double)
+    TEST_CASE(Debug_Poison_Double)
     {
         double x = 0.0;
 
-        poison(x);
+        debug_poison(x);
 
         EXPECT_FALSE(x == x);
     }
 
-    TEST_CASE(Poison_Bool)
+    TEST_CASE(Debug_Poison_Bool)
     {
         bool b = false;
 
-        poison(b);
+        debug_poison(b);
 
         // We can't expect much here.
     }
@@ -130,16 +132,124 @@ TEST_SUITE(Foundation_Utility_Poison)
     // Templates cannot take local types in C++03.
     enum Enum { A, B, C };
 
-    TEST_CASE(Poison_Enum)
+    TEST_CASE(Debug_Poison_Enum)
     {
         Enum actual = A;
-        poison(actual);
+        debug_poison(actual);
 
         int expected = 0;
-        poison(expected);
+        debug_poison(expected);
+
+        EXPECT_EQ(expected, actual);
+    }
+}
+#endif 
+
+// always_poison should work in any build mode.
+
+TEST_SUITE(Foundation_Utility_Always_Poison)
+{
+    TEST_CASE(Always_Poison_Int8)
+    {
+        std::int8_t x = 0;
+
+        always_poison(x);
+
+        EXPECT_EQ(std::int8_t(0xADU), x);
+    }
+
+    TEST_CASE(Always_Poison_UInt8)
+    {
+        std::uint8_t x = 0;
+
+        always_poison(x);
+
+        EXPECT_EQ(0xADU, x);
+    }
+
+    TEST_CASE(Always_Poison_Int32)
+    {
+        std::int32_t x = 0;
+
+        always_poison(x);
+
+        EXPECT_EQ(std::int32_t(0xADADADADU), x);
+    }
+
+    TEST_CASE(Always_Poison_UInt32)
+    {
+        std::uint32_t x = 0;
+
+        always_poison(x);
+
+        EXPECT_EQ(0xADADADADU, x);
+    }
+
+    TEST_CASE(Always_Poison_VoidPointer)
+    {
+        void* p = nullptr;
+
+        always_poison(p);
+
+#ifdef APPLESEED_ARCH32
+        EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFu), p);
+#else
+        EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFDEADBEEFull), p);
+#endif
+    }
+
+    TEST_CASE(Always_Poison_IntPointer)
+    {
+        int* p = nullptr;
+
+        always_poison(p);
+
+#ifdef APPLESEED_ARCH32
+        EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFu), p);
+#else
+        EXPECT_EQ(reinterpret_cast<void*>(0xDEADBEEFDEADBEEFull), p);
+#endif
+    }
+
+    TEST_CASE(Always_Poison_Float)
+    {
+        float x = 0.0f;
+
+        always_poison(x);
+
+        EXPECT_FALSE(x == x);
+    }
+
+    TEST_CASE(Always_Poison_Double)
+    {
+        double x = 0.0;
+
+        always_poison(x);
+
+        EXPECT_FALSE(x == x);
+    }
+
+    TEST_CASE(Always_Poison_Bool)
+    {
+        bool b = false;
+
+        always_poison(b);
+
+        // We can't expect much here.
+    }
+
+    // Templates cannot take local types in C++03.
+    enum Enum { A, B, C };
+
+    TEST_CASE(Always_Poison_Enum)
+    {
+        Enum actual = A;
+        always_poison(actual);
+
+        int expected = 0;
+        always_poison(expected);
 
         EXPECT_EQ(expected, actual);
     }
 }
 
-#endif

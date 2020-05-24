@@ -37,13 +37,13 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/bezier.h"
 #include "foundation/math/polynomial.h"
 #include "foundation/math/root.h"
 #include "foundation/math/scalar.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/iostreamop.h"
 
 // Standard headers.
@@ -51,7 +51,6 @@
 #include <limits>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -491,7 +490,7 @@ void Camera::initialize_ray(
     ShadingRay&             ray) const
 {
     ray.m_tmin = 0.0;
-    ray.m_tmax = numeric_limits<double>::max();
+    ray.m_tmax = std::numeric_limits<double>::max();
     ray.m_flags = VisibilityFlags::CameraRay;
     ray.m_depth = 0;
 
@@ -581,12 +580,12 @@ float Camera::map_to_shutter_curve_impl_linear(const float sample) const
     if (sample < impl->m_inverse_cdf_open_point)
     {
         // Shutter is opening.
-        return sqrt(impl->m_shutter_curve_linear_open_multiplier * sample);
+        return std::sqrt(impl->m_shutter_curve_linear_open_multiplier * sample);
     }
     else if (sample > impl->m_inverse_cdf_close_point)
     {
         // Shutter is closing.
-        return 1.0f - sqrt(impl->m_shutter_curve_linear_close_multiplier * (sample - 1.0f));
+        return 1.0f - std::sqrt(impl->m_shutter_curve_linear_close_multiplier * (sample - 1.0f));
     }
     else
     {

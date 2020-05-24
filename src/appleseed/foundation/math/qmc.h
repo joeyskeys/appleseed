@@ -30,13 +30,14 @@
 #pragma once
 
 // appleseed.foundation headers.
+#include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 #include "foundation/platform/arch.h"
-#include "foundation/platform/types.h"
 
 // Standard headers.
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 
 namespace foundation
 {
@@ -70,12 +71,12 @@ T radical_inverse_base2(
 // Radical inverse in base 2, 32-bit version.
 template <typename T>
 T radical_inverse_base2_32(
-    uint32              value);         // input digits
+    std::uint32_t       value);         // input digits
 
 // Radical inverse in base 2, 64-bit version.
 template <typename T>
 T radical_inverse_base2_64(
-    uint64              value);         // input digits
+    std::uint64_t       value);         // input digits
 
 // Folded radical inverse in base 2.
 template <typename T>
@@ -216,19 +217,25 @@ inline T radical_inverse_base2(
 
 template <typename T>
 inline T radical_inverse_base2_32(
-    uint32              value)
+    std::uint32_t       value)
 {
     value = (value >> 16) | (value << 16);                                                      // 16-bit swap
     value = ((value & 0xFF00FF00u) >> 8) | ((value & 0x00FF00FFu) << 8);                        // 8-bit swap
     value = ((value & 0xF0F0F0F0u) >> 4) | ((value & 0x0F0F0F0Fu) << 4);                        // 4-bit swap
     value = ((value & 0xCCCCCCCCu) >> 2) | ((value & 0x33333333u) << 2);                        // 2-bit swap
     value = ((value & 0xAAAAAAAAu) >> 1) | ((value & 0x55555555u) << 1);                        // 1-bit swap
-    return static_cast<T>(value / 4294967296.0f);
+
+    const T result = value * Rcp2Pow32<T>();
+
+    assert(result >= T(0.0));
+    assert(result < T(1.0));
+
+    return result;
 }
 
 template <typename T>
 inline T radical_inverse_base2_64(
-    uint64              value)
+    std::uint64_t       value)
 {
     value = (value >> 32) | (value << 32);                                                      // 32-bit swap
     value = ((value & 0xFFFF0000FFFF0000ull) >> 16) | ((value & 0x0000FFFF0000FFFFull) << 16);  // 16-bit swap
@@ -236,7 +243,13 @@ inline T radical_inverse_base2_64(
     value = ((value & 0xF0F0F0F0F0F0F0F0ull) >> 4)  | ((value & 0x0F0F0F0F0F0F0F0Full) << 4);   // 4-bit swap
     value = ((value & 0xCCCCCCCCCCCCCCCCull) >> 2)  | ((value & 0x3333333333333333ull) << 2);   // 2-bit swap
     value = ((value & 0xAAAAAAAAAAAAAAAAull) >> 1)  | ((value & 0x5555555555555555ull) << 1);   // 1-bit swap
-    return static_cast<T>(value / 18446744073709551616.0);
+
+    const T result = value * Rcp2Pow64<T>();
+
+    assert(result >= T(0.0));
+    assert(result < T(1.0));
+
+    return result;
 }
 
 template <typename T>

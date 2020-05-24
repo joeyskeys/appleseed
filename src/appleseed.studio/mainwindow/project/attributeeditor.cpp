@@ -32,6 +32,8 @@
 
 // appleseed.studio headers.
 #include "mainwindow/project/ientityvalueprovider.h"
+
+// appleseed.qtcommon headers.
 #include "utility/miscellaneous.h"
 
 // appleseed.renderer headers.
@@ -43,9 +45,9 @@
 // Standard headers.
 #include <utility>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -72,12 +74,12 @@ void AttributeEditor::clear()
 }
 
 void AttributeEditor::edit(
-    unique_ptr<EntityEditor::IFormFactory>      form_factory,
-    unique_ptr<EntityEditor::IEntityBrowser>    entity_browser,
-    unique_ptr<CustomEntityUI>                  custom_ui,
-    const Dictionary&                           values,
-    QObject*                                    receiver,
-    const char*                                 slot_apply)
+    std::unique_ptr<EntityEditor::IFormFactory>      form_factory,
+    std::unique_ptr<EntityEditor::IEntityBrowser>    entity_browser,
+    std::unique_ptr<CustomEntityUI>                  custom_ui,
+    const Dictionary&                                values,
+    QObject*                                         receiver,
+    const char*                                      slot_apply)
 {
     IEntityValueProvider* value_provider = dynamic_cast<IEntityValueProvider*>(receiver);
     if (value_provider)
@@ -101,7 +103,7 @@ void AttributeEditor::edit(
 void AttributeEditor::refresh() const
 {
     if (m_entity_editor.get() && m_value_provider)
-        m_entity_editor.get()->rebuild_form(m_value_provider->get_values());
+        m_entity_editor->rebuild_form(m_value_provider->get_values());
 }
 
 }   // namespace studio

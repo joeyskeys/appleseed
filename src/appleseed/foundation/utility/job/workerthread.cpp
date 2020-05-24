@@ -39,14 +39,13 @@
 #include "foundation/utility/job/ijob.h"
 #include "foundation/utility/job/jobmanager.h"
 #include "foundation/utility/job/jobqueue.h"
-#include "foundation/utility/log.h"
+#include "foundation/log/log.h"
 
 // Standard headers.
 #include <exception>
 #include <new>
 
 using namespace boost;
-using namespace std;
 
 namespace foundation
 {
@@ -209,7 +208,7 @@ bool WorkerThread::execute_job(IJob& job)
     {
         job.execute(m_index);
     }
-    catch (const bad_alloc&)
+    catch (const std::bad_alloc&)
     {
         LOG_ERROR(
             m_logger,

@@ -32,6 +32,15 @@ import argparse
 import os
 import shutil
 
+from utils import print_runtime_details  # local module
+
+
+# -------------------------------------------------------------------------------------------------
+# Constants.
+# -------------------------------------------------------------------------------------------------
+
+VERSION = "1.0"
+
 
 # -------------------------------------------------------------------------------------------------
 # Utility functions.
@@ -79,9 +88,12 @@ def main():
     parser.add_argument("directory", nargs='?', default=".", help="directory to scan")
     args = parser.parse_args()
 
+    print_runtime_details("updatetestsuiterefimages", VERSION, os.path.realpath(__file__))
+
     for dirpath, dirnames, filenames in walk(args.directory, args.recursive):
         if "renders" in dirnames:
             update_ref_images(dirpath)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

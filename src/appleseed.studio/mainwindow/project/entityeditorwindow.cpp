@@ -33,7 +33,7 @@
 // UI definition header.
 #include "ui_entityeditorwindow.h"
 
-// appleseed.studio headers.
+// appleseed.qtcommon headers.
 #include "utility/miscellaneous.h"
 
 // Qt headers.
@@ -45,22 +45,22 @@
 // Standard headers.
 #include <utility>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
 
 EntityEditorWindow::EntityEditorWindow(
-    QWidget*                                    parent,
-    const string&                               window_title,
-    const Project&                              project,
-    ParamArray&                                 settings,
-    unique_ptr<EntityEditor::IFormFactory>      form_factory,
-    unique_ptr<EntityEditor::IEntityBrowser>    entity_browser,
-    unique_ptr<CustomEntityUI>                  custom_entity_ui,
-    const Dictionary&                           values)
+    QWidget*                                         parent,
+    const std::string&                               window_title,
+    const Project&                                   project,
+    ParamArray&                                      settings,
+    std::unique_ptr<EntityEditor::IFormFactory>      form_factory,
+    std::unique_ptr<EntityEditor::IEntityBrowser>    entity_browser,
+    std::unique_ptr<CustomEntityUI>                  custom_entity_ui,
+    const Dictionary&                                values)
   : WindowBase(parent, "entity_editor_window")
   , m_ui(new Ui::EntityEditorWindow())
 {

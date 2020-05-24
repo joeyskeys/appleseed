@@ -37,9 +37,9 @@
 #include "foundation/core/appleseed.h"
 #include "foundation/core/thirdparties.h"
 #include "foundation/platform/compiler.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/apistringpair.h"
-#include "foundation/utility/string.h"
 
 // Qt headers.
 #include <QKeySequence>
@@ -54,7 +54,6 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -113,15 +112,22 @@ namespace
 
 void AboutWindow::set_library_features()
 {
-    const bool WithDisneyMaterial =
-#ifdef APPLESEED_WITH_DISNEY_MATERIAL
+    const bool WithEmbree =
+#ifdef APPLESEED_WITH_EMBREE
         true;
 #else
         false;
 #endif
 
-    const bool WithEmbree =
-#ifdef APPLESEED_WITH_EMBREE
+    const bool WithSpectralSupport =
+#ifdef APPLESEED_WITH_SPECTRAL_SUPPORT
+        true;
+#else
+        false;
+#endif
+
+    const bool WithGPUSupport =
+#ifdef APPLESEED_WITH_GPU
         true;
 #else
         false;
@@ -130,8 +136,9 @@ void AboutWindow::set_library_features()
     QString details;
     details += "This build of appleseed has the following features:\n\n";
     details += QString("  Instruction sets: %1\n").arg(Appleseed::get_lib_cpu_features());
-    details += QString("  Disney material: %1\n").arg(to_enabled_disabled(WithDisneyMaterial));
     details += QString("  Embree: %1\n").arg(to_enabled_disabled(WithEmbree));
+    details += QString("  Spectral support: %1\n").arg(to_enabled_disabled(WithSpectralSupport));
+    details += QString("  GPU support: %1\n").arg(to_enabled_disabled(WithGPUSupport));
     details += "\n";
     m_ui->label_details->setText(m_ui->label_details->text() + details);
 }
@@ -142,10 +149,10 @@ void AboutWindow::set_third_party_libraries_information()
     versions.push_back(APIStringPair("Qt", QT_VERSION_STR));
 
     // Create a vector of indices into `versions` to allow enumerating libraries in sorted order.
-    vector<size_t> versions_indices(versions.size());
+    std::vector<size_t> versions_indices(versions.size());
     for (size_t i = 0, e = versions.size(); i < e; ++i)
         versions_indices[i] = i;
-    sort(
+    std::sort(
         versions_indices.begin(),
         versions_indices.end(),
         [&versions](const size_t lhs, const size_t rhs)

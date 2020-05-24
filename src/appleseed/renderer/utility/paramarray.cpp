@@ -35,7 +35,6 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -76,7 +75,7 @@ ParamArray& ParamArray::insert_path(const char* path, const char* value)
     assert(path);
     assert(value);
 
-    vector<string> parts;
+    std::vector<std::string> parts;
     tokenize(path, PartSeparator, parts);
 
     assert(!parts.empty());
@@ -85,15 +84,15 @@ ParamArray& ParamArray::insert_path(const char* path, const char* value)
 
     for (size_t i = 0; i < parts.size() - 1; ++i)
     {
-        const string& part = parts[i];
+        const std::string& part = parts[i];
 
-        if (!leaf->dictionaries().exist(part))
-            leaf->insert(part, Dictionary());
+        if (!leaf->dictionaries().exist(part.c_str()))
+            leaf->insert(part.c_str(), Dictionary());
 
-        leaf = &leaf->dictionary(part);
+        leaf = &leaf->dictionary(part.c_str());
     }
 
-    leaf->insert(parts.back(), value);
+    leaf->insert(parts.back().c_str(), value);
 
     return *this;
 }
@@ -102,7 +101,7 @@ bool ParamArray::exist_path(const char* path) const
 {
     assert(path);
 
-    vector<string> parts;
+    std::vector<std::string> parts;
     tokenize(path, PartSeparator, parts);
 
     assert(!parts.empty());
@@ -111,10 +110,10 @@ bool ParamArray::exist_path(const char* path) const
 
     for (size_t i = 0; i < parts.size() - 1; ++i)
     {
-        if (!leaf->dictionaries().exist(parts[i]))
+        if (!leaf->dictionaries().exist(parts[i].c_str()))
             return false;
 
-        leaf = &leaf->dictionary(parts[i]);
+        leaf = &leaf->dictionary(parts[i].c_str());
     }
 
     return leaf->strings().exist(parts.back().c_str());
@@ -124,7 +123,7 @@ const char* ParamArray::get_path(const char* path) const
 {
     assert(path);
 
-    vector<string> parts;
+    std::vector<std::string> parts;
     tokenize(path, PartSeparator, parts);
 
     assert(!parts.empty());
@@ -132,7 +131,7 @@ const char* ParamArray::get_path(const char* path) const
     const Dictionary* leaf = this;
 
     for (size_t i = 0; i < parts.size() - 1; ++i)
-        leaf = &leaf->dictionary(parts[i]);
+        leaf = &leaf->dictionary(parts[i].c_str());
 
     return leaf->strings().get(parts.back().c_str());
 }
@@ -141,7 +140,7 @@ ParamArray& ParamArray::remove_path(const char* path)
 {
     assert(path);
 
-    vector<string> parts;
+    std::vector<std::string> parts;
     tokenize(path, PartSeparator, parts);
 
     assert(!parts.empty());
@@ -150,10 +149,10 @@ ParamArray& ParamArray::remove_path(const char* path)
 
     for (size_t i = 0; i < parts.size() - 1; ++i)
     {
-        if (!leaf->dictionaries().exist(parts[i]))
+        if (!leaf->dictionaries().exist(parts[i].c_str()))
             return *this;
 
-        leaf = &leaf->dictionary(parts[i]);
+        leaf = &leaf->dictionary(parts[i].c_str());
     }
 
     leaf->strings().remove(parts.back().c_str());

@@ -30,11 +30,9 @@
 #include "apistring.h"
 
 // Standard headers.
-#include <algorithm>
 #include <cassert>
 #include <cstring>
 
-using namespace std;
 
 namespace foundation
 {
@@ -78,7 +76,9 @@ APIString& APIString::operator=(const APIString& rhs)
 
 APIString& APIString::operator=(APIString&& rhs) APPLESEED_NOEXCEPT
 {
-    swap(m_s, rhs.m_s);
+    free_string(m_s);
+    m_s = rhs.m_s;
+    rhs.m_s = nullptr;
     return *this;
 }
 

@@ -35,13 +35,13 @@
 // appleseed.foundation headers.
 #include "foundation/image/color.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
 
 // OIIO headers.
 #include "OpenImageIO/ustring.h"
 
 // Standard headers.
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 // Forward declarations.
@@ -63,7 +63,7 @@ namespace renderer
 // Cut off event enum for path termination in path tracer.
 //
 
-enum class TerminateType :foundation::uint8
+enum class TerminateType : std::uint8_t
 {
     NoMaterialTerminate,
     RussianRouletteTerminate,
@@ -129,7 +129,7 @@ class LightPathStream
   private:
     friend class LightPathRecorder;
 
-    enum class EventType : foundation::uint8
+    enum class EventType : std::uint8_t
     {
         HitReflector,
         HitEmitter,
@@ -143,7 +143,7 @@ class LightPathStream
     struct Event
     {
         EventType                   m_type;
-        foundation::uint8           m_data_index;               // index of this event's data in one of the data array
+        std::uint8_t                m_data_index;               // index of this event's data in one of the data array
     };
 
     struct HitReflectorData
@@ -187,14 +187,14 @@ class LightPathStream
         TerminateType type;
     };
 
-    typedef foundation::Vector<foundation::uint16, 2> Vector2u16;
+    typedef foundation::Vector<std::uint16_t, 2> Vector2u16;
 
     struct StoredPath
     {
         Vector2u16                  m_pixel_coords;
         foundation::Vector2f        m_sample_position;
-        foundation::uint32          m_vertex_begin_index;       // index of the first vertex in m_vertices
-        foundation::uint32          m_vertex_end_index;         // index of one vertex past the last one in m_vertices
+        std::uint32_t               m_vertex_begin_index;       // index of the first vertex in m_vertices
+        std::uint32_t               m_vertex_end_index;         // index of one vertex past the last one in m_vertices
     };
 
     struct StoredPathVertex

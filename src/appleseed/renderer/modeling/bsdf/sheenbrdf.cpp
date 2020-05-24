@@ -37,14 +37,12 @@
 #include "renderer/modeling/bsdf/bsdfwrapper.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
-
-// Standard headers.
-#include <cmath>
 
 // Forward declarations.
 namespace foundation    { class IAbortSwitch; }
@@ -52,7 +50,6 @@ namespace renderer      { class Assembly; }
 namespace renderer      { class Project; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -98,6 +95,8 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
@@ -111,10 +110,10 @@ namespace
             sampling_context.split_in_place(2, 1);
             const Vector2f s = sampling_context.next2<Vector2f>();
             const Vector3f wi = sample_hemisphere_uniform(s);
-            const Vector3f incoming = sample.m_shading_basis.transform_to_parent(wi);
+            const Vector3f incoming = local_geometry.m_shading_basis.transform_to_parent(wi);
             sample.m_incoming = Dual3f(incoming);
 
-            const Vector3f h = normalize(incoming + sample.m_outgoing.get_value());
+            const Vector3f h = normalize(incoming + outgoing.get_value());
             const float cos_ih = dot(incoming, h);
             const float fh = pow_int<5>(saturate(1.0f - cos_ih));
 
@@ -124,15 +123,14 @@ namespace
             sample.m_value.m_glossy *= fh * values->m_reflectance_multiplier;
             sample.m_value.m_beauty = sample.m_value.m_glossy;
 
-            sample.compute_reflected_differentials();
+            sample.compute_diffuse_differentials(outgoing);
         }
 
         float evaluate(
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -158,8 +156,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override

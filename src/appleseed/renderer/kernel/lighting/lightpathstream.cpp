@@ -46,7 +46,7 @@
 #include "renderer/modeling/scene/scene.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/memory.h"
+#include "foundation/memory/memory.h"
 #include "foundation/utility/otherwise.h"
 
 // Standard headers.
@@ -101,7 +101,7 @@ void LightPathStream::hit_reflector(const PathVertex& vertex)
 
     Event event;
     event.m_type = EventType::HitReflector;
-    event.m_data_index = static_cast<uint8>(m_hit_reflector_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_hit_reflector_data.size());
     m_events.push_back(event);
 
     HitReflectorData data;
@@ -122,7 +122,7 @@ void LightPathStream::hit_emitter(
 
     Event event;
     event.m_type = EventType::HitEmitter;
-    event.m_data_index = static_cast<uint8>(m_hit_emitter_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_hit_emitter_data.size());
     m_events.push_back(event);
 
     HitEmitterData data;
@@ -141,13 +141,13 @@ void LightPathStream::sampled_emitting_shape(
 {
     Event event;
     event.m_type = EventType::SampledEmitter;
-    event.m_data_index = static_cast<uint8>(m_sampled_emitter_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_sampled_emitter_data.size());
     m_events.push_back(event);
 
     SampledEmitterData data;
     data.m_entity =
-        shape.m_assembly_instance->get_assembly().object_instances().get_by_index(
-            shape.m_object_instance_index);
+        shape.get_assembly_instance()->get_assembly().object_instances().get_by_index(
+            shape.get_object_instance_index());
     data.m_vertex_position = Vector3f(emission_position);
     data.m_material_value = material_value.to_rgb(g_std_lighting_conditions);
     data.m_emitted_radiance = emitted_radiance.to_rgb(g_std_lighting_conditions);
@@ -162,7 +162,7 @@ void LightPathStream::sampled_non_physical_light(
 {
     Event event;
     event.m_type = EventType::SampledEmitter;
-    event.m_data_index = static_cast<uint8>(m_sampled_emitter_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_sampled_emitter_data.size());
     m_events.push_back(event);
 
     SampledEmitterData data;
@@ -181,7 +181,7 @@ void LightPathStream::sampled_environment(
 {
     Event event;
     event.m_type = EventType::SampledEnvironment;
-    event.m_data_index = static_cast<uint8>(m_sampled_env_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_sampled_env_data.size());
     m_events.push_back(event);
 
     SampledEnvData data;
@@ -196,7 +196,7 @@ void LightPathStream::sampled_volume(const bool is_homogeneous)
 {
     Event event;
     event.m_type = EventType::SampledVolume;
-    event.m_data_index = static_cast<uint8>(m_sampled_volume_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_sampled_volume_data.size());
     m_events.push_back(event);
 
     SampledVolumeData data;
@@ -208,7 +208,7 @@ void LightPathStream::terminate(const TerminateType& terminate_type)
 {
     Event event;
     event.m_type = EventType::Terminate;
-    event.m_data_index = static_cast<uint8>(m_cut_off_data.size());
+    event.m_data_index = static_cast<std::uint8_t>(m_cut_off_data.size());
     m_events.push_back(event);
 
     TerminateData data;
@@ -378,7 +378,7 @@ void LightPathStream::create_path_from_hit_emitter(const size_t emitter_event_in
     StoredPath stored_path;
     stored_path.m_pixel_coords = Vector2u16(m_pixel_coords);
     stored_path.m_sample_position = m_sample_position;
-    stored_path.m_vertex_begin_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_begin_index = static_cast<std::uint32_t>(m_vertices.size());
 
     // Emitter vertex.
     StoredPathVertex emitter_vertex;
@@ -409,9 +409,18 @@ void LightPathStream::create_path_from_hit_emitter(const size_t emitter_event_in
 
             // Update current radiance.
             const auto& throughput = event_data.m_path_throughput;
+            // Multiply by previous throughput to attenuate by the next hit
             current_radiance *= prev_throughput;
+            // Divide by throughput before previous so that we isolate only throughput from the light source to current vertex,
+            // since throughput is cumulative in reverse
             current_radiance /= throughput;
             prev_throughput = throughput;
+
+            // If the hit is an emitter, add the radiance to current
+            if (event.m_type == EventType::HitEmitter)
+            {
+                current_radiance += m_hit_emitter_data[event.m_data_index].m_emitted_radiance;
+            }
         }
     }
 
@@ -423,7 +432,7 @@ void LightPathStream::create_path_from_hit_emitter(const size_t emitter_event_in
     m_vertices.push_back(camera_vertex);
 
     // Store path.
-    stored_path.m_vertex_end_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_end_index = static_cast<std::uint32_t>(m_vertices.size());
     m_paths.push_back(stored_path);
 }
 
@@ -448,7 +457,7 @@ void LightPathStream::create_path_from_sampled_emitter(const size_t emitter_even
     StoredPath stored_path;
     stored_path.m_pixel_coords = Vector2u16(m_pixel_coords);
     stored_path.m_sample_position = m_sample_position;
-    stored_path.m_vertex_begin_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_begin_index = static_cast<std::uint32_t>(m_vertices.size());
 
     // Emitter vertex.
     StoredPathVertex emitter_vertex;
@@ -479,9 +488,18 @@ void LightPathStream::create_path_from_sampled_emitter(const size_t emitter_even
 
             // Update current radiance.
             const auto& throughput = event_data.m_path_throughput;
+            // Multiply by previous throughput to attenuate by the next hit
             current_radiance *= prev_throughput;
+            // Divide by throughput before previous so that we isolate only throughput from the light source to current vertex,
+            // since throughput is cumulative in reverse
             current_radiance /= throughput;
             prev_throughput = throughput;
+
+            // If the hit is an emitter, add the radiance to current
+            if (event.m_type == EventType::HitEmitter)
+            {
+                current_radiance += m_hit_emitter_data[event.m_data_index].m_emitted_radiance;
+            }
         }
     }
 
@@ -493,7 +511,7 @@ void LightPathStream::create_path_from_sampled_emitter(const size_t emitter_even
     m_vertices.push_back(camera_vertex);
 
     // Store path.
-    stored_path.m_vertex_end_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_end_index = static_cast<std::uint32_t>(m_vertices.size());
     m_paths.push_back(stored_path);
 }
 
@@ -514,7 +532,7 @@ void LightPathStream::create_path_from_sampled_environment(const size_t env_even
     StoredPath stored_path;
     stored_path.m_pixel_coords = Vector2u16(m_pixel_coords);
     stored_path.m_sample_position = m_sample_position;
-    stored_path.m_vertex_begin_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_begin_index = static_cast<std::uint32_t>(m_vertices.size());
 
     // Emitter vertex.
     StoredPathVertex emitter_vertex;
@@ -545,9 +563,18 @@ void LightPathStream::create_path_from_sampled_environment(const size_t env_even
 
             // Update current radiance.
             const auto& throughput = event_data.m_path_throughput;
+            // Multiply by previous throughput to attenuate by the next hit
             current_radiance *= prev_throughput;
+            // Divide by throughput before previous so that we isolate only throughput from the light source to current vertex,
+            // since throughput is cumulative in reverse
             current_radiance /= throughput;
             prev_throughput = throughput;
+
+            // If the hit is an emitter, add the radiance to current
+            if (event.m_type == EventType::HitEmitter)
+            {
+                current_radiance += m_hit_emitter_data[event.m_data_index].m_emitted_radiance;
+            }
         }
     }
 
@@ -559,7 +586,7 @@ void LightPathStream::create_path_from_sampled_environment(const size_t env_even
     m_vertices.push_back(camera_vertex);
 
     // Store path.
-    stored_path.m_vertex_end_index = static_cast<uint32>(m_vertices.size());
+    stored_path.m_vertex_end_index = static_cast<std::uint32_t>(m_vertices.size());
     m_paths.push_back(stored_path);
 }
 

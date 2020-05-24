@@ -34,6 +34,7 @@
 #include "renderer/modeling/postprocessingstage/postprocessingstage.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/core/appleseed.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/color.h"
@@ -46,9 +47,8 @@
 #include "foundation/math/vector.h"
 #include "foundation/platform/system.h"
 #include "foundation/resources/logo/appleseed-seeds-256.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
-#include "foundation/utility/string.h"
 
 // OpenImageIO headers.
 #include "foundation/platform/_beginoiioheaders.h"
@@ -63,7 +63,6 @@
 
 using namespace foundation;
 using namespace OIIO;
-using namespace std;
 
 namespace renderer
 {
@@ -72,7 +71,7 @@ namespace
 {
     const char* Model = "render_stamp_post_processing_stage";
 
-    const string DefaultFormatString = "appleseed {lib-version} | Time: {render-time}";
+    const std::string DefaultFormatString = "appleseed {lib-version} | Time: {render-time}";
     const float DefaultScaleFactor = 1.0f;
     const float MinScaleFactor = 0.1f;
     const float MaxScaleFactor = 20.0f;
@@ -130,7 +129,7 @@ namespace
             const double render_time = render_info.get_optional<double>("render_time", 0.0);
 
             // Compute the final string.
-            string text = m_format_string;
+            std::string text = m_format_string;
             text = replace(text, "{lib-name}", Appleseed::get_lib_name());
             text = replace(text, "{lib-version}", Appleseed::get_lib_version());
             text = replace(text, "{lib-cpu-features}", Appleseed::get_lib_cpu_features());
@@ -178,7 +177,7 @@ namespace
             const float filter_width = fit(m_scale_factor, MinScaleFactor, MaxScaleFactor, 2.75f, 4.5f);
             ImageBufAlgo::resize(scaled_unpremult_icon, unpremult_icon, "mitchell", filter_width, roi);
             ImageBufAlgo::premult(scaled_premult_icon, scaled_unpremult_icon, ROI::All());
-            unique_ptr<float[]> pixels(new float[roi.width() * roi.height() * roi.nchannels()]);
+            std::unique_ptr<float[]> pixels(new float[roi.width() * roi.height() * roi.nchannels()]);
             scaled_premult_icon.get_pixels(ROI::All(), TypeDesc::TypeFloat, pixels.get());
 
             // Blit the appleseed logo.
@@ -205,9 +204,9 @@ namespace
         }
 
       private:
-        string   m_format_string;
-        float    m_scale_factor;
-        ImageBuf m_icon;
+        std::string   m_format_string;
+        float         m_scale_factor;
+        ImageBuf      m_icon;
     };
 }
 

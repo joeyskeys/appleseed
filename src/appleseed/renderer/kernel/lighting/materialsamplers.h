@@ -31,20 +31,19 @@
 // appleseed.renderer headers.
 #include "renderer/global/globaltypes.h"
 #include "renderer/kernel/shading/shadingray.h"
+#include "renderer/modeling/bsdf/bsdf.h"
 
 // appleseed.foundation headers.
-#include "foundation/math/basis.h"
 #include "foundation/math/dual.h"
 #include "foundation/math/vector.h"
 
 // Forward declarations.
-namespace renderer  { class BSDF; }
 namespace renderer  { class DirectShadingComponents; }
 namespace renderer  { class ShadingContext; }
 namespace renderer  { class ShadingPoint; }
 
 //
-// This file contains wrappers over sampleable entities, such as BSDFs and Volumes.
+// This file contains wrappers over samplable entities, such as BSDFs and Volumes.
 // These wrappers provide a uniform interface for sampling and evaluating these entities
 // at a certain point, which can be used during lighting integration.
 //
@@ -86,9 +85,9 @@ class IMaterialSampler
         float&                          pdf) const = 0;
 
     virtual float evaluate(
-        const int                       light_sampling_modes,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
+        const int                       light_sampling_modes,
         DirectShadingComponents&        value) const = 0;
 };
 
@@ -131,18 +130,17 @@ class BSDFSampler
         float&                          pdf) const override;
 
     float evaluate(
-        const int                       light_sampling_modes,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
+        const int                       light_sampling_modes,
         DirectShadingComponents&        value) const override;
 
   private:
     const BSDF&                         m_bsdf;
     const void*                         m_bsdf_data;
     const int                           m_bsdf_sampling_modes;
-    const foundation::Basis3d&          m_shading_basis;
-    const foundation::Vector3d&         m_geometric_normal;
     const ShadingPoint&                 m_shading_point;
+    BSDF::LocalGeometry                 m_local_geometry;
 };
 
 class VolumeSampler
@@ -185,9 +183,9 @@ class VolumeSampler
         float&                          pdf) const override;
 
     float evaluate(
-        const int                       light_sampling_modes,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
+        const int                       light_sampling_modes,
         DirectShadingComponents&        value) const override;
 
   private:

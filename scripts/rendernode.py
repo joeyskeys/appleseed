@@ -41,6 +41,8 @@ import time
 import traceback
 import xml.dom.minidom as xml
 
+from utils import print_runtime_details
+
 
 # -------------------------------------------------------------------------------------------------
 # Constants.
@@ -76,6 +78,7 @@ def format_message(severity, msg):
     padded_severity = severity.ljust(7)
     return "\n".join("{0} node  {1} | {2}".format(timestamp, padded_severity, line)
                      for line in msg.splitlines())
+
 
 VALID_USER_NAME_CHARS = frozenset("%s%s_-" % (string.ascii_letters, string.digits))
 
@@ -440,6 +443,8 @@ def main():
     parser.add_argument("directory", help="directory to watch")
     args = parser.parse_args()
 
+    print_runtime_details("rendernode", VERSION, os.path.realpath(__file__))
+
     # If no tool path is provided, search for the tool in the same directory as this script.
     if args.tool_path is None:
         script_directory = os.path.dirname(os.path.realpath(__file__))
@@ -502,5 +507,6 @@ def main():
 
     log.info("exiting...")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

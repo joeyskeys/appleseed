@@ -40,8 +40,8 @@
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 #include "foundation/platform/arch.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/gnuplotfile.h"
-#include "foundation/utility/string.h"
 #include "foundation/utility/test.h"
 #include "foundation/utility/testutils.h"
 
@@ -54,20 +54,59 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Math_QMC)
 {
-    TEST_CASE(RadicalInverseBase2)
+    TEST_CASE(RadicalInverseBase2_32_Float)
     {
-        EXPECT_FEQ(0.0,     radical_inverse_base2<double>(0));
-        EXPECT_FEQ(0.5,     radical_inverse_base2<double>(1));
-        EXPECT_FEQ(0.25,    radical_inverse_base2<double>(2));
-        EXPECT_FEQ(0.75,    radical_inverse_base2<double>(3));
-        EXPECT_FEQ(0.125,   radical_inverse_base2<double>(4));
-        EXPECT_FEQ(0.625,   radical_inverse_base2<double>(5));
-        EXPECT_FEQ(0.375,   radical_inverse_base2<double>(6));
-        EXPECT_FEQ(0.875,   radical_inverse_base2<double>(7));
+        EXPECT_FEQ(0.000f, radical_inverse_base2_32<float>(0));
+        EXPECT_FEQ(0.500f, radical_inverse_base2_32<float>(1));
+        EXPECT_FEQ(0.250f, radical_inverse_base2_32<float>(2));
+        EXPECT_FEQ(0.750f, radical_inverse_base2_32<float>(3));
+        EXPECT_FEQ(0.125f, radical_inverse_base2_32<float>(4));
+        EXPECT_FEQ(0.625f, radical_inverse_base2_32<float>(5));
+        EXPECT_FEQ(0.375f, radical_inverse_base2_32<float>(6));
+        EXPECT_FEQ(0.875f, radical_inverse_base2_32<float>(7));
+        EXPECT_EQ(0.999999881f, radical_inverse_base2_32<float>(0xFFFFFFFFul));
+    }
+
+    TEST_CASE(RadicalInverseBase2_32_Double)
+    {
+        EXPECT_FEQ(0.000, radical_inverse_base2_32<double>(0));
+        EXPECT_FEQ(0.500, radical_inverse_base2_32<double>(1));
+        EXPECT_FEQ(0.250, radical_inverse_base2_32<double>(2));
+        EXPECT_FEQ(0.750, radical_inverse_base2_32<double>(3));
+        EXPECT_FEQ(0.125, radical_inverse_base2_32<double>(4));
+        EXPECT_FEQ(0.625, radical_inverse_base2_32<double>(5));
+        EXPECT_FEQ(0.375, radical_inverse_base2_32<double>(6));
+        EXPECT_FEQ(0.875, radical_inverse_base2_32<double>(7));
+        EXPECT_EQ(0.99999999976716936, radical_inverse_base2_32<double>(0xFFFFFFFFul));
+    }
+
+    TEST_CASE(RadicalInverseBase2_64_Float)
+    {
+        EXPECT_FEQ(0.000f, radical_inverse_base2_64<float>(0));
+        EXPECT_FEQ(0.500f, radical_inverse_base2_64<float>(1));
+        EXPECT_FEQ(0.250f, radical_inverse_base2_64<float>(2));
+        EXPECT_FEQ(0.750f, radical_inverse_base2_64<float>(3));
+        EXPECT_FEQ(0.125f, radical_inverse_base2_64<float>(4));
+        EXPECT_FEQ(0.625f, radical_inverse_base2_64<float>(5));
+        EXPECT_FEQ(0.375f, radical_inverse_base2_64<float>(6));
+        EXPECT_FEQ(0.875f, radical_inverse_base2_64<float>(7));
+        EXPECT_EQ(0.999999881f, radical_inverse_base2_64<float>(0xFFFFFFFFFFFFFFFFull));
+    }
+
+    TEST_CASE(RadicalInverseBase2_64_Double)
+    {
+        EXPECT_FEQ(0.000, radical_inverse_base2_64<double>(0));
+        EXPECT_FEQ(0.500, radical_inverse_base2_64<double>(1));
+        EXPECT_FEQ(0.250, radical_inverse_base2_64<double>(2));
+        EXPECT_FEQ(0.750, radical_inverse_base2_64<double>(3));
+        EXPECT_FEQ(0.125, radical_inverse_base2_64<double>(4));
+        EXPECT_FEQ(0.625, radical_inverse_base2_64<double>(5));
+        EXPECT_FEQ(0.375, radical_inverse_base2_64<double>(6));
+        EXPECT_FEQ(0.875, radical_inverse_base2_64<double>(7));
+        EXPECT_EQ(0.99999999999999978, radical_inverse_base2_64<double>(0xFFFFFFFFFFFFFFFFull));
     }
 
     TEST_CASE(RadicalInverse_Base2)
@@ -176,7 +215,7 @@ TEST_SUITE(Foundation_Math_QMC)
 
     TEST_CASE(Generate2DRandomSequenceImage)
     {
-        vector<Vector2d> points;
+        std::vector<Vector2d> points;
         MersenneTwister rng;
 
         for (size_t i = 0; i < PointCount; ++i)
@@ -191,9 +230,9 @@ TEST_SUITE(Foundation_Math_QMC)
     }
 
     void apply_permutation(
-        const string&   permutation,
-        const size_t    size,
-        size_t          perm[])
+        const std::string&   permutation,
+        const size_t         size,
+        size_t               perm[])
     {
         if (permutation == "identity")
             identity_permutation(size, perm);
@@ -205,10 +244,10 @@ TEST_SUITE(Foundation_Math_QMC)
     }
 
     void generate_halton_sequence_image(
-        const size_t    b0,
-        const size_t    b1,
-        const string&   permutation,
-        const size_t    initial_instance = 0)
+        const size_t         b0,
+        const size_t         b1,
+        const std::string&   permutation,
+        const size_t         initial_instance = 0)
     {
         const size_t bases[2] = { b0, b1 };
 
@@ -216,12 +255,12 @@ TEST_SUITE(Foundation_Math_QMC)
         apply_permutation(permutation, b0, perms);
         apply_permutation(permutation, b1, perms + b0);
 
-        vector<Vector2d> points;
+        std::vector<Vector2d> points;
 
         for (size_t i = 0; i < PointCount; ++i)
             points.push_back(halton_sequence<double, 2>(bases, perms, initial_instance + i));
 
-        const string filename =
+        const std::string filename =
               "unit tests/outputs/test_qmc_halton_" + permutation + "_permuted_"
             + to_string(b0) + "_" + to_string(b1) + "_"
             + (initial_instance > 0 ? to_string(initial_instance) : "")
@@ -260,15 +299,15 @@ TEST_SUITE(Foundation_Math_QMC)
     }
 
     void generate_hammersley_sequence_image(
-        const size_t    b,
-        const string&   permutation)
+        const size_t         b,
+        const std::string&   permutation)
     {
         const size_t bases[1] = { b };
 
         size_t perms[100];
         apply_permutation(permutation, b, perms);
 
-        vector<Vector2d> points;
+        std::vector<Vector2d> points;
 
         for (size_t i = 0; i < PointCount; ++i)
             points.push_back(hammersley_sequence<double, 2>(bases, perms, PointCount, i));
@@ -308,7 +347,7 @@ TEST_SUITE(Foundation_Math_QMC)
     {
         const size_t bases[1] = { b };
 
-        vector<Vector2d> points;
+        std::vector<Vector2d> points;
 
         for (size_t i = 0; i < PointCount; ++i)
             points.push_back(hammersley_zaremba_sequence<double, 2>(bases, PointCount, i));
@@ -346,7 +385,7 @@ TEST_SUITE(Foundation_Math_QMC)
         // is scrambled with a distinct random value: the resulting sample set is
         // indistinguishable from what would be obtained using pure random sampling.
 
-        vector<Vector2d> points;
+        std::vector<Vector2d> points;
         MersenneTwister rng;
 
         for (size_t i = 0; i < PointCount; ++i)
@@ -498,19 +537,19 @@ TEST_SUITE(Foundation_Math_QMC)
         double rng_area = 0.0;
         double qmc_area = 0.0;
 
-        vector<Vector2d> rng_rmsd(SampleCount);
-        vector<Vector2d> qmc_rmsd(SampleCount);
+        std::vector<Vector2d> rng_rmsd(SampleCount);
+        std::vector<Vector2d> qmc_rmsd(SampleCount);
 
         for (size_t i = 0; i < SampleCount; ++i)
         {
-            rng_area += sin(rand_double2(rng) * Pi<double>());
-            qmc_area += sin(radical_inverse_base2<double>(i) * Pi<double>());
+            rng_area += std::sin(rand_double2(rng) * Pi<double>());
+            qmc_area += std::sin(radical_inverse_base2<double>(i) * Pi<double>());
 
             const double n = static_cast<double>(i + 1);
             const double v = Pi<double>() / n;
 
-            rng_rmsd[i] = Vector2d(n, abs(rng_area * v - ExactArea));
-            qmc_rmsd[i] = Vector2d(n, abs(qmc_area * v - ExactArea));
+            rng_rmsd[i] = Vector2d(n, std::abs(rng_area * v - ExactArea));
+            qmc_rmsd[i] = Vector2d(n, std::abs(qmc_area * v - ExactArea));
         }
 
         GnuplotFile plotfile;
@@ -550,7 +589,7 @@ TEST_SUITE(Foundation_Math_QMC)
             {
                 const double s = radical_inverse<double>(Primes[d], i);
 
-                fprintf(file, "%.16f", s);
+                fprintf(file, "%.17f", s);
 
                 if (d < Dimension - 1)
                     fprintf(file, ", ");

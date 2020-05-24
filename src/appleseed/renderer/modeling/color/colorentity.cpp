@@ -36,8 +36,9 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
+#include "foundation/platform/types.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/iostreamop.h"
 
 // Standard headers.
@@ -45,7 +46,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -83,6 +83,7 @@ ColorEntity::ColorEntity(
 
     extract_parameters();
     extract_values();
+    remove_color_alpha_parameters();
 
     check_validity();
 }
@@ -97,6 +98,7 @@ ColorEntity::ColorEntity(
     set_name(name);
 
     extract_parameters();
+    remove_color_alpha_parameters();
 
     impl->m_values = values;
     impl->m_alpha.push_back(1.0f);
@@ -115,6 +117,7 @@ ColorEntity::ColorEntity(
     set_name(name);
 
     extract_parameters();
+    remove_color_alpha_parameters();
 
     impl->m_values = values;
     impl->m_alpha = alpha;
@@ -132,7 +135,7 @@ void ColorEntity::extract_parameters()
     // Retrieve the color space.
     const ColorSpace DefaultColorSpace = ColorSpaceSRGB;
     const char* DefaultColorSpaceName = color_space_name(DefaultColorSpace);
-    const string color_space = m_params.get_required<string>("color_space", DefaultColorSpaceName);
+    const std::string color_space = m_params.get_required<std::string>("color_space", DefaultColorSpaceName);
     if (color_space == "linear_rgb")
         impl->m_color_space = ColorSpaceLinearRGB;
     else if (color_space == "srgb")
@@ -196,7 +199,10 @@ void ColorEntity::extract_values()
 
     impl->m_values = m_params.get_required("color", black);
     impl->m_alpha = m_params.get_optional("alpha", opaque);
+}
 
+void ColorEntity::remove_color_alpha_parameters()
+{
     m_params.strings().remove("color");
     m_params.strings().remove("alpha");
 }

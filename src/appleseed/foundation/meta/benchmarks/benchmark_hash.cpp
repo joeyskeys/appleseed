@@ -27,43 +27,43 @@
 //
 
 // appleseed.foundation headers.
-#include "foundation/math/hash.h"
-#include "foundation/platform/types.h"
+#include "foundation/hash/hash.h"
 #include "foundation/utility/benchmark.h"
+
+// Standard headers.
+#include <cstdint>
 
 using namespace foundation;
 
-BENCHMARK_SUITE(Foundation_Math_Hash)
+BENCHMARK_SUITE(Foundation_Hash_Hash)
 {
-    const uint32 N = 1000;
+    const std::uint32_t N = 1000;
 
     struct Fixture
     {
-        uint32  m_uint_result;
-        float   m_float_result;
+        std::uint32_t m_result;
 
         Fixture()
-          : m_uint_result(0)
-          , m_float_result(0.0f)
+          : m_result(0)
         {
         }
     };
 
     BENCHMARK_CASE_F(HashUInt32, Fixture)
     {
-        for (uint32 i = 0; i < N; ++i)
-            m_uint_result += hash_uint32(i);
+        for (std::uint32_t i = 0; i < N; ++i)
+            m_result += hash_uint32(i);
     }
 
-    BENCHMARK_CASE_F(HashUInt32Pixar, Fixture)
+    BENCHMARK_CASE_F(HashUInt32Wang, Fixture)
     {
-        for (uint32 i = 0; i < N; ++i)
-            m_float_result += hash_uint32_pixar(i, 12345678);
+        for (std::uint32_t i = 0; i < N; ++i)
+            m_result += hash_uint32_wang(i);
     }
 
     BENCHMARK_CASE_F(MixUInt32, Fixture)
     {
-        for (uint32 i = 0; i < N; ++i)
-            m_uint_result += mix_uint32(i, m_uint_result);
+        for (std::uint32_t i = 0; i < N; ++i)
+            m_result += mix_uint32(i, m_result);
     }
 }

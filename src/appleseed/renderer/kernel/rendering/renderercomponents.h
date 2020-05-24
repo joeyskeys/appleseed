@@ -29,9 +29,9 @@
 #pragma once
 
 // appleseed.renderer headers.
-#include "renderer/kernel/lighting/ilightingengine.h"
 #include "renderer/kernel/lighting/backwardlightsampler.h"
 #include "renderer/kernel/lighting/forwardlightsampler.h"
+#include "renderer/kernel/lighting/ilightingengine.h"
 #include "renderer/kernel/rendering/iframerenderer.h"
 #include "renderer/kernel/rendering/ipasscallback.h"
 #include "renderer/kernel/rendering/ipixelrenderer.h"
@@ -42,7 +42,7 @@
 #include "renderer/kernel/shading/shadingengine.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 
 // Standard headers.
 #include <memory>
@@ -88,24 +88,25 @@ class RendererComponents
     // Ask every component to print its settings.
     void print_settings() const;
 
-    // This method is called before rendering begins, and whenever rendering is reinitialized
-    // (i.e. because an entity has been edited). At this point, all entities inputs are bound.
-    // Returns true on success, or false if an error occurred or if the abort switch was triggered.
+    // Please refer to the documentation of Entity::on_render_begin().
     bool on_render_begin(
         OnRenderBeginRecorder&      recorder,
         foundation::IAbortSwitch*   abort_switch = nullptr);
 
-    // This method is called before rendering a frame begins, and whenever rendering is restarted
-    // (i.e. because the camera has been moved). At this point, all entities inputs are bound.
-    // Returns true on success, or false if an error occurred or if the abort switch was triggered.
+    // Please refer to the documentation of Entity::on_frame_begin().
     bool on_frame_begin(
         OnFrameBeginRecorder&       recorder,
         foundation::IAbortSwitch*   abort_switch = nullptr);
 
     // Retrieve individual components.
+    const TraceContext& get_trace_context() const;
+    BackwardLightSampler* get_backward_light_sampler() const;
     ShadingEngine& get_shading_engine();
-    IShadingResultFrameBufferFactory& get_shading_result_framebuffer_factory();
-    IFrameRenderer& get_frame_renderer();
+    TextureStore& get_texture_store() const;
+    OIIOTextureSystem& get_oiio_texture_system();
+    OSLShadingSystem& get_osl_shading_system();
+    IShadingResultFrameBufferFactory& get_shading_result_framebuffer_factory() const;
+    IFrameRenderer& get_frame_renderer() const;
 
   private:
     const Project&                                      m_project;
@@ -118,14 +119,14 @@ class RendererComponents
     std::unique_ptr<BackwardLightSampler>               m_backward_light_sampler;
     ShadingEngine                                       m_shading_engine;
     TextureStore&                                       m_texture_store;
-    OIIOTextureSystem&                                  m_texture_system;
-    OSLShadingSystem&                                   m_shading_system;
+    OIIOTextureSystem&                                  m_oiio_texture_system;
+    OSLShadingSystem&                                   m_osl_shading_system;
 
+    std::unique_ptr<IShadingResultFrameBufferFactory>   m_shading_result_framebuffer_factory;
     std::unique_ptr<ILightingEngineFactory>             m_lighting_engine_factory;
     std::unique_ptr<ISampleRendererFactory>             m_sample_renderer_factory;
     std::unique_ptr<ISampleGeneratorFactory>            m_sample_generator_factory;
     std::unique_ptr<IPixelRendererFactory>              m_pixel_renderer_factory;
-    std::unique_ptr<IShadingResultFrameBufferFactory>   m_shading_result_framebuffer_factory;
     std::unique_ptr<ITileRendererFactory>               m_tile_renderer_factory;
     std::unique_ptr<IPassCallback>                      m_pass_callback;
     foundation::auto_release_ptr<IFrameRenderer>        m_frame_renderer;
@@ -136,7 +137,7 @@ class RendererComponents
     bool create_pixel_renderer_factory();
     bool create_shading_result_framebuffer_factory();
     bool create_tile_renderer_factory();
-    bool create_frame_renderer_factory();
+    bool create_frame_renderer();
 };
 
 
@@ -144,17 +145,42 @@ class RendererComponents
 // RendererComponents class implementation.
 //
 
+inline const TraceContext& RendererComponents::get_trace_context() const
+{
+    return m_trace_context;
+}
+
+inline BackwardLightSampler* RendererComponents::get_backward_light_sampler() const
+{
+    return m_backward_light_sampler.get();
+}
+
 inline ShadingEngine& RendererComponents::get_shading_engine()
 {
     return m_shading_engine;
 }
 
-inline IFrameRenderer& RendererComponents::get_frame_renderer()
+inline TextureStore& RendererComponents::get_texture_store() const
+{
+    return m_texture_store;
+}
+
+inline OIIOTextureSystem& RendererComponents::get_oiio_texture_system()
+{
+    return m_oiio_texture_system;
+}
+
+inline OSLShadingSystem& RendererComponents::get_osl_shading_system()
+{
+    return m_osl_shading_system;
+}
+
+inline IFrameRenderer& RendererComponents::get_frame_renderer() const
 {
     return *m_frame_renderer.get();
 }
 
-inline IShadingResultFrameBufferFactory& RendererComponents::get_shading_result_framebuffer_factory()
+inline IShadingResultFrameBufferFactory& RendererComponents::get_shading_result_framebuffer_factory() const
 {
     return *m_shading_result_framebuffer_factory.get();
 }

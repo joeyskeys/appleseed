@@ -43,6 +43,7 @@
 #include "renderer/kernel/rendering/debug/debugtilerenderer.h"
 #include "renderer/kernel/rendering/ephemeralshadingresultframebufferfactory.h"
 #include "renderer/kernel/rendering/final/adaptivetilerenderer.h"
+#include "renderer/kernel/rendering/final/texturecontrolledpixelrenderer.h"
 #include "renderer/kernel/rendering/final/uniformpixelrenderer.h"
 #include "renderer/kernel/rendering/generic/genericframerenderer.h"
 #include "renderer/kernel/rendering/generic/genericsamplegenerator.h"
@@ -55,11 +56,16 @@
 #include "renderer/modeling/project/project.h"
 #include "renderer/utility/paramarray.h"
 
+// OpenImageIO headers.
+#include "foundation/platform/_beginoiioheaders.h"
+#include "OpenImageIO/imagebuf.h"
+#include "foundation/platform/_endoiioheaders.h"
+
 // Standard headers.
 #include <string>
 
 using namespace foundation;
-using namespace std;
+using namespace OIIO;
 
 namespace renderer
 {
@@ -109,13 +115,16 @@ RendererComponents::RendererComponents(
   , m_backward_light_sampler(nullptr)
   , m_shading_engine(get_child_and_inherit_globals(params, "shading_engine"))
   , m_texture_store(texture_store)
-  , m_texture_system(texture_system)
-  , m_shading_system(shading_system)
+  , m_oiio_texture_system(texture_system)
+  , m_osl_shading_system(shading_system)
 {
 }
 
 bool RendererComponents::create()
 {
+    if (!create_shading_result_framebuffer_factory())
+        return false;
+
     if (!create_lighting_engine_factory())
         return false;
 
@@ -128,13 +137,10 @@ bool RendererComponents::create()
     if (!create_pixel_renderer_factory())
         return false;
 
-    if (!create_shading_result_framebuffer_factory())
-        return false;
-
     if (!create_tile_renderer_factory())
         return false;
 
-    if (!create_frame_renderer_factory())
+    if (!create_frame_renderer())
         return false;
 
     return true;
@@ -168,7 +174,7 @@ bool RendererComponents::on_frame_begin(
 
 bool RendererComponents::create_lighting_engine_factory()
 {
-    const string name = m_params.get_required<string>("lighting_engine", "pt");
+    const std::string name = m_params.get_required<std::string>("lighting_engine", "pt");
 
     if (name.empty())
     {
@@ -225,8 +231,9 @@ bool RendererComponents::create_lighting_engine_factory()
                 *m_forward_light_sampler,
                 m_trace_context,
                 m_texture_store,
-                m_texture_system,
-                m_shading_system,
+                m_oiio_texture_system,
+                m_osl_shading_system,
+                *m_shading_result_framebuffer_factory,
                 sppm_params);
 
         m_pass_callback.reset(sppm_pass_callback);
@@ -251,7 +258,7 @@ bool RendererComponents::create_lighting_engine_factory()
 
 bool RendererComponents::create_sample_renderer_factory()
 {
-    const string name = m_params.get_required<string>("sample_renderer", "generic");
+    const std::string name = m_params.get_required<std::string>("sample_renderer", "generic");
 
     if (name.empty())
     {
@@ -267,8 +274,8 @@ bool RendererComponents::create_sample_renderer_factory()
                 m_texture_store,
                 m_lighting_engine_factory.get(),
                 m_shading_engine,
-                m_texture_system,
-                m_shading_system,
+                m_oiio_texture_system,
+                m_osl_shading_system,
                 get_child_and_inherit_globals(m_params, "generic_sample_renderer")));
         return true;
     }
@@ -293,7 +300,7 @@ bool RendererComponents::create_sample_renderer_factory()
 
 bool RendererComponents::create_sample_generator_factory()
 {
-    const string name = m_params.get_optional<string>("sample_generator", "");
+    const std::string name = m_params.get_optional<std::string>("sample_generator", "");
 
     if (name.empty())
     {
@@ -329,8 +336,8 @@ bool RendererComponents::create_sample_generator_factory()
                 m_trace_context,
                 m_texture_store,
                 *m_forward_light_sampler,
-                m_texture_system,
-                m_shading_system,
+                m_oiio_texture_system,
+                m_osl_shading_system,
                 get_child_and_inherit_globals(m_params, "lighttracing_sample_generator")));
 
         return true;
@@ -346,7 +353,7 @@ bool RendererComponents::create_sample_generator_factory()
 
 bool RendererComponents::create_pixel_renderer_factory()
 {
-    const string name = m_params.get_optional<string>("pixel_renderer", "");
+    const std::string name = m_params.get_optional<std::string>("pixel_renderer", "");
 
     if (name.empty())
     {
@@ -368,6 +375,40 @@ bool RendererComponents::create_pixel_renderer_factory()
 
         return true;
     }
+    else if (name == "texture")
+    {
+        if (m_sample_renderer_factory.get() == nullptr)
+        {
+            RENDERER_LOG_ERROR("cannot use the texture-controlled pixel renderer without a sample renderer.");
+            return false;
+        }
+
+        ParamArray tex_sampler_params = get_child_and_inherit_globals(m_params, "texture_controlled_pixel_renderer");
+        const std::string tex_path = tex_sampler_params.get_optional<std::string>("file_path", "");
+
+        if (tex_path.empty())
+        {
+            RENDERER_LOG_ERROR("no texture path was specified for the texture-controlled pixel renderer.");
+            return false;
+        }
+
+        std::unique_ptr<TextureControlledPixelRendererFactory> texture_controlled_renderer_factory(
+            new TextureControlledPixelRendererFactory(
+                m_frame,
+                m_sample_renderer_factory.get(),
+                tex_sampler_params)
+        );
+
+        if (!texture_controlled_renderer_factory->load_texture(tex_path))
+        {
+            RENDERER_LOG_ERROR("could not read the texture specified for the texture-controlled pixel renderer.");
+            return false;
+        }
+
+        m_pixel_renderer_factory = std::move(texture_controlled_renderer_factory);
+
+        return true;
+    }
     else
     {
         RENDERER_LOG_ERROR(
@@ -379,7 +420,7 @@ bool RendererComponents::create_pixel_renderer_factory()
 
 bool RendererComponents::create_shading_result_framebuffer_factory()
 {
-    const string name = m_params.get_optional<string>("shading_result_framebuffer", "ephemeral");
+    const std::string name = m_params.get_optional<std::string>("shading_result_framebuffer", "ephemeral");
 
     if (name.empty())
     {
@@ -408,7 +449,7 @@ bool RendererComponents::create_shading_result_framebuffer_factory()
 
 bool RendererComponents::create_tile_renderer_factory()
 {
-    const string name = m_params.get_optional<string>("tile_renderer", "");
+    const std::string name = m_params.get_optional<std::string>("tile_renderer", "");
 
     if (name.empty())
     {
@@ -479,9 +520,9 @@ bool RendererComponents::create_tile_renderer_factory()
     }
 }
 
-bool RendererComponents::create_frame_renderer_factory()
+bool RendererComponents::create_frame_renderer()
 {
-    const string name = m_params.get_required<string>("frame_renderer", "generic");
+    const std::string name = m_params.get_required<std::string>("frame_renderer", "generic");
 
     if (name.empty())
     {

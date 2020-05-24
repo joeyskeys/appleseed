@@ -30,7 +30,7 @@
 // projecttool headers.
 #include "commandlinehandler.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 #include "application/superlogger.h"
 
@@ -38,8 +38,8 @@
 #include "renderer/api/project.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/autoreleaseptr.h"
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/memory/autoreleaseptr.h"
+#include "foundation/containers/dictionary.h"
 
 // Boost headers.
 #include "boost/filesystem/operations.hpp"
@@ -49,17 +49,16 @@
 #include <string>
 
 using namespace appleseed::projecttool;
-using namespace appleseed::shared;
+using namespace appleseed::common;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace
 {
     CommandLineHandler g_cl;
 
-    auto_release_ptr<Project> load_project(const string& project_filepath)
+    auto_release_ptr<Project> load_project(const std::string& project_filepath)
     {
         // Construct the schema file path.
         const bf::path schema_filepath =
@@ -71,9 +70,8 @@ namespace
         // Note: it is crucial that we read mesh files as well, so that we can collect
         // material slots declared by objects. Material slots are required by the project
         // file updater, for instance when migrating projects from rev. 7 to rev. 8.
-        ProjectFileReader reader;
         return
-            reader.read(
+            ProjectFileReader::read(
                 project_filepath.c_str(),
                 schema_filepath.string().c_str(),
                 ProjectFileReader::OmitProjectFileUpdate);
@@ -88,7 +86,7 @@ namespace
 bool update_project()
 {
     // Retrieve the input project path.
-    const string& input_filepath = g_cl.m_positional_args.values()[1];
+    const std::string& input_filepath = g_cl.m_positional_args.values()[1];
 
     // Read the input project from disk.
     auto_release_ptr<Project> project(load_project(input_filepath));
@@ -120,7 +118,7 @@ bool update_project()
 bool remove_unused_entities()
 {
     // Retrieve the input project path.
-    const string& input_filepath = g_cl.m_positional_args.values()[1];
+    const std::string& input_filepath = g_cl.m_positional_args.values()[1];
 
     // Read the input project from disk.
     auto_release_ptr<Project> project(load_project(input_filepath));
@@ -153,7 +151,7 @@ bool remove_unused_entities()
 bool pack_project()
 {
     // Retrieve the input project path.
-    const string& input_filepath = g_cl.m_positional_args.values()[1];
+    const std::string& input_filepath = g_cl.m_positional_args.values()[1];
 
     // Read the input project from disk.
     auto_release_ptr<Project> project(load_project(input_filepath));
@@ -161,7 +159,7 @@ bool pack_project()
         return false;
 
     // Build the path of the output project.
-    const string packed_file_path =
+    const std::string packed_file_path =
         bf::path(input_filepath).replace_extension(".appleseedz").string();
 
     // Write the project to disk.
@@ -176,7 +174,7 @@ bool pack_project()
 bool unpack_project()
 {
     // Retrieve the input project path.
-    const string& input_filepath = g_cl.m_positional_args.values()[1];
+    const std::string& input_filepath = g_cl.m_positional_args.values()[1];
 
     // Read the input project from disk.
     auto_release_ptr<Project> project(load_project(input_filepath));
@@ -184,7 +182,7 @@ bool unpack_project()
         return false;
 
     // Build the path of the output project.
-    const string unpacked_file_path =
+    const std::string unpacked_file_path =
         bf::path(input_filepath).replace_extension(".appleseed").string();
 
     // Write the project to disk.
@@ -208,7 +206,7 @@ bool unpack_project()
 bool print_entity_dependencies(SuperLogger& logger)
 {
     // Retrieve the input project path.
-    const string& input_filepath = g_cl.m_positional_args.values()[1];
+    const std::string& input_filepath = g_cl.m_positional_args.values()[1];
 
     // Read the input project from disk.
     auto_release_ptr<Project> project(load_project(input_filepath));
@@ -256,7 +254,7 @@ int main(int argc, char* argv[])
     global_logger().initialize_from(logger);
 
     // Retrieve the command.
-    const string& command = g_cl.m_positional_args.values()[0];
+    const std::string& command = g_cl.m_positional_args.values()[0];
 
     // Execute the command.
     bool success = false;

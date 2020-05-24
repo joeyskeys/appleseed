@@ -38,15 +38,16 @@
 #include "renderer/modeling/input/sourceinputs.h"
 
 // appleseed.foundation headers.
+#include "foundation/math/minmax.h"
+#include "foundation/memory/arena.h"
 #include "foundation/utility/api/apistring.h"
-#include "foundation/utility/arena.h"
 
 // Standard headers.
 #include <cmath>
+#include <limits>
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -108,8 +109,6 @@ bool EDF::on_frame_begin(
             get_path().c_str());
     }
 
-    m_max_contribution = get_uncached_max_contribution();
-
     if (get_uncached_importance_multiplier() <= 0.0f)
     {
         RENDERER_LOG_WARNING(
@@ -139,7 +138,7 @@ float EDF::get_max_contribution_scalar(const Source* source) const
     assert(source);
 
     if (!source->is_uniform())
-        return numeric_limits<float>::max();
+        return std::numeric_limits<float>::max();
 
     float value;
     source->evaluate_uniform(value);
@@ -152,7 +151,7 @@ float EDF::get_max_contribution_spectrum(const Source* source) const
     assert(source);
 
     if (!source->is_uniform())
-        return numeric_limits<float>::max();
+        return std::numeric_limits<float>::max();
 
     Spectrum spectrum;
     source->evaluate_uniform(spectrum);
@@ -165,22 +164,14 @@ float EDF::get_max_contribution(
     const Source*           multiplier,
     const Source*           exposure) const
 {
-    const float max_contribution_input = get_max_contribution_spectrum(input);
+    const float max_input = get_max_contribution_spectrum(input);
+    const float max_multiplier = get_max_contribution_scalar(multiplier);
+    const float max_exposure = get_max_contribution_scalar(exposure);
 
-    if (max_contribution_input == numeric_limits<float>::max())
-        return numeric_limits<float>::max();
-
-    const float max_contribution_multiplier = get_max_contribution_scalar(multiplier);
-
-    if (max_contribution_multiplier == numeric_limits<float>::max())
-        return numeric_limits<float>::max();
-
-    const float max_contribution_exposure = get_max_contribution_scalar(exposure);
-
-    if (max_contribution_exposure == numeric_limits<float>::max())
-        return numeric_limits<float>::max();
-
-    return max_contribution_input * max_contribution_multiplier * pow(2.0f, max_contribution_exposure);
+    return
+        max(max_input, max_multiplier, max_exposure) < std::numeric_limits<float>::max()
+            ? max_input * max_multiplier * std::pow(2.0f, max_exposure)
+            : std::numeric_limits<float>::max();
 }
 
 float EDF::get_max_contribution(

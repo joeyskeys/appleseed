@@ -38,13 +38,13 @@
 #include "renderer/modeling/scene/scene.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <cmath>
@@ -56,7 +56,6 @@ namespace renderer      { class Assembly; }
 namespace renderer      { class ShadingContext; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -93,21 +92,19 @@ namespace
             return Model;
         }
 
-        bool on_frame_begin(
+        bool on_render_begin(
             const Project&          project,
             const BaseGroup*        parent,
-            OnFrameBeginRecorder&   recorder,
+            OnRenderBeginRecorder&  recorder,
             IAbortSwitch*           abort_switch) override
         {
-            if (!Light::on_frame_begin(project, parent, recorder, abort_switch))
+            if (!Light::on_render_begin(project, parent, recorder, abort_switch))
                 return false;
 
             if (!check_uniform("irradiance") ||
                 !check_uniform("irradiance_multiplier") ||
                 !check_uniform("exposure"))
-            {
                 return false;
-            }
 
             check_non_zero_emission("irradiance", "irradiance_multiplier");
 
@@ -117,7 +114,7 @@ namespace
             m_safe_scene_diameter = scene_data.m_safe_diameter;
 
             m_inputs.evaluate_uniforms(&m_values);
-            m_values.m_irradiance *= m_values.m_irradiance_multiplier * pow(2.0f, m_values.m_exposure);
+            m_values.m_irradiance *= m_values.m_irradiance_multiplier * std::pow(2.0f, m_values.m_exposure);
 
             return true;
         }
@@ -313,16 +310,16 @@ DictionaryArray DirectionalLightFactory::get_input_metadata() const
             .insert("name", "exposure")
             .insert("label", "Exposure")
             .insert("type", "numeric")
-            .insert("use", "optional")
-            .insert("default", "0.0")
             .insert("min",
                 Dictionary()
-                    .insert("value", "-64.0")
+                    .insert("value", "-8.0")
                     .insert("type", "soft"))
             .insert("max",
                 Dictionary()
-                    .insert("value", "64.0")
+                    .insert("value", "8.0")
                     .insert("type", "soft"))
+            .insert("use", "optional")
+            .insert("default", "0.0")
             .insert("help", "Light exposure"));
 
     add_common_input_metadata(metadata);

@@ -48,16 +48,15 @@
 #include "foundation/math/scalar.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/autoreleaseptr.h"
 
 // Forward declarations.
 namespace foundation    { class IAbortSwitch; }
 namespace renderer      { class OnRenderBeginRecorder; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -148,13 +147,10 @@ namespace
             {
                 const Vector2d px(ndc.get_value() + ndc.get_dx());
                 const Vector2d py(ndc.get_value() + ndc.get_dy());
-
-                ray.m_rx.m_org = ray.m_org;
-                ray.m_ry.m_org = ray.m_org;
-
-                ray.m_rx.m_dir = normalize(transform.vector_to_parent(ndc_to_camera(px)));
-                ray.m_ry.m_dir = normalize(transform.vector_to_parent(ndc_to_camera(py)));
-
+                ray.m_rx_org = ray.m_org;
+                ray.m_ry_org = ray.m_org;
+                ray.m_rx_dir = normalize(transform.vector_to_parent(ndc_to_camera(px)));
+                ray.m_ry_dir = normalize(transform.vector_to_parent(ndc_to_camera(py)));
                 ray.m_has_differentials = true;
             }
         }
@@ -244,8 +240,8 @@ namespace
             const Vector3d dir = normalize(point);
 
             // Convert that direction to spherical coordinates.
-            const double phi = atan2(dir.z, dir.x);
-            const double theta = acos(dir.y);
+            const double phi = std::atan2(dir.z, dir.x);
+            const double theta = std::acos(dir.y);
 
             // Convert the spherical coordinates to normalized device coordinates.
             return Vector2d(

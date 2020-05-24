@@ -81,6 +81,12 @@ class ArrayRef
         return m_array.size();
     }
 
+    // Return the size in bytes of an item in the array.
+    size_t item_size() const
+    {
+        return sizeof(T);
+    }
+
     // Return a pointer to the beginning of the array.
     const T* begin() const
     {
@@ -152,6 +158,21 @@ class ArrayRef
     void push_back(const T& x)
     {
         m_array.push_back(&x);
+    }
+
+#if APPLESEED_COMPILER_CXX_GENERALIZED_INITIALIZERS
+    // Add new items to the array.
+    void push_back(const std::initializer_list<T>& l)
+    {
+        for (const auto& x : l)
+            m_array.push_back(&x);
+    }
+#endif
+
+    void fill(const size_t size, const T& value)
+    {
+        m_array.resize(size);
+        std::fill(begin(), end(), value);
     }
 
     template <typename Iterator>

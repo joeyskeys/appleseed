@@ -29,8 +29,8 @@
 // Interface header.
 #include "pixelinspectorhandler.h"
 
-// appleseed.studio headers.
-#include "utility/mousecoordinatestracker.h"
+// appleseed.qtcommon headers.
+#include "widgets/mousecoordinatestracker.h"
 
 // appleseed.renderer headers.
 #include "renderer/api/frame.h"
@@ -53,9 +53,9 @@
 // Standard headers.
 #include <cstddef>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {

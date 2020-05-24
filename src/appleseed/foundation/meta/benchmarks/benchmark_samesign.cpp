@@ -34,7 +34,6 @@
 #ifdef APPLESEED_USE_SSE
 #include "foundation/platform/sse.h"
 #endif
-#include "foundation/platform/types.h"
 #include "foundation/utility/benchmark.h"
 #include "foundation/utility/casts.h"
 #include "foundation/utility/otherwise.h"
@@ -42,9 +41,9 @@
 // Standard headers.
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 
 using namespace foundation;
-using namespace std;
 
 BENCHMARK_SUITE(SameSign)
 {
@@ -75,7 +74,7 @@ BENCHMARK_SUITE(SameSign)
 
     APPLESEED_NO_INLINE bool same_sign_naive(const float a, const float b)
     {
-        if (abs(a) == 0.0f || abs(b) == 0.0f)
+        if (std::abs(a) == 0.0f || std::abs(b) == 0.0f)
             return true;
 
         return (a >= 0.0f) == (b >= 0.0f);
@@ -104,21 +103,21 @@ BENCHMARK_SUITE(SameSign)
 
     APPLESEED_NO_INLINE bool same_sign_integer(const float a, const float b, const float c)
     {
-        const int32 ia = binary_cast<int32>(a);
-        const int32 ib = binary_cast<int32>(b);
-        const int32 ic = binary_cast<int32>(c);
+        const std::int32_t ia = binary_cast<std::int32_t>(a);
+        const std::int32_t ib = binary_cast<std::int32_t>(b);
+        const std::int32_t ic = binary_cast<std::int32_t>(c);
 
-        const int32 az = (ia & 0x7FFFFFFFL) == 0;
-        const int32 bz = (ib & 0x7FFFFFFFL) == 0;
-        const int32 cz = (ic & 0x7FFFFFFFL) == 0;
+        const std::int32_t az = (ia & 0x7FFFFFFFL) == 0;
+        const std::int32_t bz = (ib & 0x7FFFFFFFL) == 0;
+        const std::int32_t cz = (ic & 0x7FFFFFFFL) == 0;
 
-        const int32 ab = (ia ^ ib) >= 0;
-        const int32 ac = (ia ^ ic) >= 0;
-        const int32 bc = (ib ^ ic) >= 0;
+        const std::int32_t ab = (ia ^ ib) >= 0;
+        const std::int32_t ac = (ia ^ ic) >= 0;
+        const std::int32_t bc = (ib ^ ic) >= 0;
 
-        const int32 b1 = ab | az | bz;
-        const int32 b2 = ac | az | cz;
-        const int32 b3 = bc | bz | cz;
+        const std::int32_t b1 = ab | az | bz;
+        const std::int32_t b2 = ac | az | cz;
+        const std::int32_t b3 = bc | bz | cz;
 
         return (b1 & b2 & b3) != 0;
     }

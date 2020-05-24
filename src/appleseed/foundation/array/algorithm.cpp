@@ -29,27 +29,58 @@
 // appleseed.foundation headers.
 #include "foundation/array/algorithm.h"
 #include "foundation/array/arraytraits.h"
-#include "foundation/platform/types.h"
 
 // Standard headers.
 #include <algorithm>
+#include <cstdint>
 
 namespace foundation
 {
 namespace
 {
-    template <typename SrcType, typename DstType>
-    void convert_array(Array& array)
+
+template <typename SrcType, typename DstType>
+void convert_array(Array& array)
+{
+    Array tmp(ArrayTraits<DstType>::array_type());
+    tmp.reserve(array.size());
+
+    ArrayView<SrcType> src(array);
+    ArrayRef<DstType> dst(tmp);
+
+    for (const auto value : src)
+        dst.push_back(static_cast<DstType>(value));
+
+    array = std::move(tmp);
+}
+
+struct ComputeBBoxVisitor
+{
+    AABB3f m_bbox;
+
+    ComputeBBoxVisitor()
     {
-        Array tmp(ArrayTraits<DstType>::array_type());
-        tmp.reserve(array.size());
-
-        ArrayView<SrcType> src(array);
-        ArrayRef<DstType> dst(tmp);
-
-        std::copy(src.begin(), src.end(), std::back_inserter(dst));
-        array = std::move(tmp);
+        m_bbox.invalidate();
     }
+
+    explicit ComputeBBoxVisitor(const AABB3f& bbox)
+    : m_bbox(bbox)
+    {
+    }
+
+    void operator()(const ArrayView<Vector3f>& view)
+    {
+        for (const Vector3f& p : view)
+            m_bbox.insert(p);
+    }
+
+    template <typename T>
+    void operator()(const ArrayView<T>& view)
+    {
+        throw BadArrayTypeException();
+    }
+};
+
 }
 
 void convert_to_smallest_type(Array& array)
@@ -61,29 +92,43 @@ void convert_to_smallest_type(Array& array)
     {
       case UInt16Type:
       {
-        const ArrayView<uint16> view(array);
-        const uint16 max_element = *std::max_element(view.begin(), view.end());
+        const ArrayView<std::uint16_t> view(array);
+        const std::uint16_t max_element = *std::max_element(view.begin(), view.end());
 
-        if (max_element <= std::numeric_limits<uint8>::max())
-            convert_array<uint16, uint8>(array);
+        if (max_element <= std::numeric_limits<std::uint8_t>::max())
+            convert_array<std::uint16_t, std::uint8_t>(array);
       }
       break;
 
       case UInt32Type:
       {
-        const ArrayView<uint32> view(array);
-        const uint32 max_element = *std::max_element(view.begin(), view.end());
+        const ArrayView<std::uint32_t> view(array);
+        const std::uint32_t max_element = *std::max_element(view.begin(), view.end());
 
-        if (max_element <= std::numeric_limits<uint8>::max())
-            convert_array<uint32, uint8>(array);
-        else if (max_element <= std::numeric_limits<uint16>::max())
-            convert_array<uint32, uint16>(array);
+        if (max_element <= std::numeric_limits<std::uint8_t>::max())
+            convert_array<std::uint32_t, std::uint8_t>(array);
+        else if (max_element <= std::numeric_limits<std::uint16_t>::max())
+            convert_array<std::uint32_t, std::uint16_t>(array);
       }
       break;
 
       default:
         break;
     }
+}
+
+AABB3f compute_bounding_box(const Array& vertices)
+{
+    ComputeBBoxVisitor v;
+    apply_visitor(vertices, v);
+    return v.m_bbox;
+}
+
+AABB3f compute_bounding_box(const Array& vertices, const AABB3f& initial_bbox)
+{
+    ComputeBBoxVisitor v(initial_bbox);
+    apply_visitor(vertices, v);
+    return v.m_bbox;
 }
 
 }       // namespace foundation

@@ -56,13 +56,13 @@
 #include "foundation/image/image.h"
 #include "foundation/image/regularspectrum.h"
 #include "foundation/math/vector.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/arena.h"
+#include "foundation/memory/arena.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/statistics.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <string>
 
@@ -70,7 +70,6 @@
 namespace renderer  { class PixelContext; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -134,8 +133,8 @@ namespace
         {
             // 1/4 of a pixel, like in RenderMan RIS.
             const CanvasProperties& c = frame.image().properties();
-            m_image_point_dx = Vector2d(1.0 / (4.0 * c.m_canvas_width), 0.0);
-            m_image_point_dy = Vector2d(0.0, -1.0 / (4.0 * c.m_canvas_height));
+            m_image_point_dx = Vector2d(1.0 / (2.0 * c.m_canvas_width), 0.0);
+            m_image_point_dy = Vector2d(0.0, -1.0 / (2.0 * c.m_canvas_height));
         }
 
         ~GenericSampleRenderer() override
@@ -171,14 +170,14 @@ namespace
         {
 #ifdef DEBUG_DISPLAY_TEXTURE_CACHE_PERFORMANCE
 
-            const uint64 last_texture_cache_hit_count = m_texture_cache.get_hit_count();
-            const uint64 last_texture_cache_miss_count = m_texture_cache.get_miss_count();
+            const std::uint64_t last_texture_cache_hit_count = m_texture_cache.get_hit_count();
+            const std::uint64_t last_texture_cache_miss_count = m_texture_cache.get_miss_count();
 
 #endif
 
             // Construct a primary ray.
             ShadingRay primary_ray;
-            m_scene.get_active_camera()->spawn_ray(
+            m_scene.get_render_data().m_active_camera->spawn_ray(
                 sampling_context,
                 Dual2d(image_point, m_image_point_dx, m_image_point_dy),
                 primary_ray);
@@ -218,13 +217,14 @@ namespace
                 if (iterations == 1)
                 {
                     // Shade the first intersection point along the ray.
-                    const bool terminate_path = m_shading_engine.shade(
-                        sampling_context,
-                        pixel_context,
-                        m_shading_context,
-                        *shading_point_ptr,
-                        aov_accumulators,
-                        shading_result);
+                    const bool terminate_path =
+                        m_shading_engine.shade(
+                            sampling_context,
+                            pixel_context,
+                            m_shading_context,
+                            *shading_point_ptr,
+                            aov_accumulators,
+                            shading_result);
 
                     if (terminate_path)
                         break;
@@ -233,13 +233,14 @@ namespace
                 {
                     // Shade the next intersection point along the ray.
                     ShadingResult local_result(shading_result.m_aov_count);
-                    const bool terminate_path = m_shading_engine.shade(
-                        sampling_context,
-                        pixel_context,
-                        m_shading_context,
-                        *shading_point_ptr,
-                        aov_accumulators,
-                        local_result);
+                    const bool terminate_path =
+                        m_shading_engine.shade(
+                            sampling_context,
+                            pixel_context,
+                            m_shading_context,
+                            *shading_point_ptr,
+                            aov_accumulators,
+                            local_result);
 
                     // Composite `shading_result` over `local_result`.
                     shading_result.composite_over(local_result);
@@ -261,8 +262,8 @@ namespace
                 if (primary_ray.m_has_differentials)
                 {
                     const double t = shading_point_ptr->get_distance();
-                    primary_ray.m_rx.m_org = primary_ray.m_rx.point_at(t);
-                    primary_ray.m_ry.m_org = primary_ray.m_ry.point_at(t);
+                    primary_ray.m_rx_org = primary_ray.m_rx_org + t * primary_ray.m_rx_dir;
+                    primary_ray.m_ry_org = primary_ray.m_ry_org + t * primary_ray.m_ry_dir;
                 }
             }
 
@@ -271,8 +272,8 @@ namespace
 
 #ifdef DEBUG_DISPLAY_TEXTURE_CACHE_PERFORMANCE
 
-            const uint64 delta_hit_count = m_texture_cache.get_hit_count() - last_texture_cache_hit_count;
-            const uint64 delta_miss_count = m_texture_cache.get_miss_count() - last_texture_cache_miss_count;
+            const std::uint64_t delta_hit_count = m_texture_cache.get_hit_count() - last_texture_cache_hit_count;
+            const std::uint64_t delta_miss_count = m_texture_cache.get_miss_count() - last_texture_cache_miss_count;
 
             if (delta_hit_count + delta_miss_count == 0)
             {

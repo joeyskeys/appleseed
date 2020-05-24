@@ -35,6 +35,7 @@
 #include "renderer/kernel/lighting/pt/ptlightingengine.h"
 #include "renderer/kernel/lighting/sppm/sppmlightingengine.h"
 #include "renderer/kernel/rendering/final/adaptivetilerenderer.h"
+#include "renderer/kernel/rendering/final/texturecontrolledpixelrenderer.h"
 #include "renderer/kernel/rendering/final/uniformpixelrenderer.h"
 #include "renderer/kernel/rendering/generic/genericframerenderer.h"
 #include "renderer/kernel/rendering/progressive/progressiveframerenderer.h"
@@ -42,14 +43,13 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/containers/dictionary.h"
 
 // Standard headers.
 #include <cassert>
 #include <cstring>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -73,26 +73,43 @@ Dictionary Configuration::get_metadata()
     Dictionary metadata;
 
     metadata.insert(
+        "device",
+        Dictionary()
+            .insert("type", "enum")
+            .insert("values", "cpu")
+            .insert("default", "cpu")
+            .insert("label", "Device")
+            .insert("help", "Render device")
+            .insert(
+                "options",
+                Dictionary()
+                    .insert(
+                        "cpu",
+                        Dictionary()
+                            .insert("label", "CPU")
+                            .insert("help", "CPU device"))));
+
+    metadata.insert(
         "spectrum_mode",
         Dictionary()
-        .insert("type", "enum")
-        .insert("values", "rgb|spectral")
-        .insert("default", "rgb")
-        .insert("label", "Color Pipeline")
-        .insert("help", "Color pipeline used throughout the renderer")
-        .insert(
-            "options",
-            Dictionary()
+            .insert("type", "enum")
+            .insert("values", "rgb|spectral")
+            .insert("default", "rgb")
+            .insert("label", "Color Pipeline")
+            .insert("help", "Color pipeline used throughout the renderer")
             .insert(
-                "rgb",
+                "options",
                 Dictionary()
-                .insert("label", "RGB")
-                .insert("help", "RGB pipeline"))
-            .insert(
-                "spectral",
-                Dictionary()
-                .insert("label", "Spectral")
-                .insert("help", "Spectral pipeline using 31 equidistant components in the 400-700 nm range"))));
+                .insert(
+                    "rgb",
+                    Dictionary()
+                        .insert("label", "RGB")
+                        .insert("help", "RGB pipeline"))
+                .insert(
+                    "spectral",
+                    Dictionary()
+                        .insert("label", "Spectral")
+                        .insert("help", "Spectral pipeline using 31 equidistant components in the 400-700 nm range"))));
 
     metadata.insert(
         "sampling_mode",
@@ -175,6 +192,12 @@ Dictionary Configuration::get_metadata()
     metadata.dictionaries().insert(
         "uniform_pixel_renderer",
         UniformPixelRendererFactory::get_params_metadata());
+
+    metadata.dictionaries().insert(
+        "texture_controlled_pixel_renderer",
+        TextureControlledPixelRendererFactory::get_params_metadata());
+
+    // GenericTileRendererFactory exposes no metadata.
 
     metadata.dictionaries().insert(
         "adaptive_tile_renderer",

@@ -34,7 +34,7 @@
 #include "debug/tests/testoutputwidgetdecorator.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 // Qt headers.
 #include <QColor>
@@ -44,7 +44,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -99,14 +98,14 @@ namespace
 {
     QString time_to_qstring(const double time)
     {
-        const string s = pretty_time(time);
+        const std::string s = pretty_time(time);
         return QString::fromStdString(s);
     }
 
     void set_all_columns_text_color(QTreeWidgetItem* item, const QColor& color)
     {
         for (int i = 0; i < item->columnCount(); ++i)
-            item->setTextColor(i, color);
+            item->setForeground(i, color);
     }
 }
 
@@ -125,7 +124,7 @@ void TestOutputItem::set(
 
     if (passed)
     {
-        setTextColor(StatusColumnIndex, QColor("green"));
+        setForeground(StatusColumnIndex, QColor("green"));
     }
     else
     {

@@ -30,21 +30,21 @@
 // convertmeshfile headers.
 #include "commandlinehandler.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 #include "application/superlogger.h"
 
 // appleseed.foundation headers.
 #include "foundation/math/aabb.h"
 #include "foundation/math/vector.h"
-#include "foundation/mesh/genericmeshfilereader.h"
-#include "foundation/mesh/genericmeshfilewriter.h"
-#include "foundation/mesh/imeshbuilder.h"
-#include "foundation/mesh/imeshwalker.h"
+#include "foundation/meshio/genericmeshfilereader.h"
+#include "foundation/meshio/genericmeshfilewriter.h"
+#include "foundation/meshio/imeshbuilder.h"
+#include "foundation/meshio/imeshwalker.h"
 #include "foundation/platform/compiler.h"
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/foreach.h"
-#include "foundation/utility/log.h"
+#include "foundation/log/log.h"
 
 // Standard headers.
 #include <cstddef>
@@ -55,35 +55,34 @@
 #include <vector>
 
 using namespace appleseed::convertmeshfile;
-using namespace appleseed::shared;
+using namespace appleseed::common;
 using namespace foundation;
-using namespace std;
 
 namespace
 {
     struct Face
     {
-        vector<size_t>      m_vertices;
-        vector<size_t>      m_vertex_normals;
-        vector<size_t>      m_vertex_tex_coords;
-        size_t              m_material;
+        std::vector<size_t>        m_vertices;
+        std::vector<size_t>        m_vertex_normals;
+        std::vector<size_t>        m_vertex_tex_coords;
+        size_t                     m_material;
     };
 
     struct Mesh
     {
-        string              m_name;
-        vector<Vector3d>    m_vertices;
-        vector<Vector3d>    m_vertex_normals;
-        vector<Vector2d>    m_tex_coords;
-        vector<string>      m_material_slots;
-        deque<Face>         m_faces;
+        std::string                m_name;
+        std::vector<Vector3d>      m_vertices;
+        std::vector<Vector3d>      m_vertex_normals;
+        std::vector<Vector2d>      m_tex_coords;
+        std::vector<std::string>   m_material_slots;
+        std::deque<Face>           m_faces;
     };
 
     class MeshBuilder
       : public IMeshBuilder
     {
       public:
-        const list<Mesh>& get_meshes() const
+        const std::list<Mesh>& get_meshes() const
         {
             return m_meshes;
         }
@@ -161,9 +160,9 @@ namespace
         }
 
       private:
-        list<Mesh>  m_meshes;
-        Mesh        m_current_mesh;
-        Face        m_current_face;
+        std::list<Mesh>  m_meshes;
+        Mesh             m_current_mesh;
+        Face             m_current_face;
     };
 
     class MeshWalker
@@ -300,8 +299,8 @@ int main(int argc, char* argv[])
     cl.apply(logger);
 
     // Retrieve the input and output file paths.
-    const string& input_filepath = cl.m_filenames.values()[0];
-    const string& output_filepath = cl.m_filenames.values()[1];
+    const std::string& input_filepath = cl.m_filenames.values()[0];
+    const std::string& output_filepath = cl.m_filenames.values()[1];
 
     // Read the input mesh file.
     MeshBuilder builder;
@@ -310,7 +309,7 @@ int main(int argc, char* argv[])
         GenericMeshFileReader reader(input_filepath.c_str());
         reader.read(builder);
     }
-    catch (const exception& e)
+    catch (const std::exception& e)
     {
         LOG_FATAL(
             logger,
@@ -329,7 +328,7 @@ int main(int argc, char* argv[])
     // Optionally print the bounding box of each loaded mesh.
     if (cl.m_print_bboxes.is_set())
     {
-        for (const_each<list<Mesh>> i = builder.get_meshes(); i; ++i)
+        for (const_each<std::list<Mesh>> i = builder.get_meshes(); i; ++i)
             print_bbox(logger, *i);
     }
 
@@ -337,13 +336,13 @@ int main(int argc, char* argv[])
     GenericMeshFileWriter writer(output_filepath.c_str());
     try
     {
-        for (const_each<list<Mesh>> i = builder.get_meshes(); i; ++i)
+        for (const_each<std::list<Mesh>> i = builder.get_meshes(); i; ++i)
         {
             const MeshWalker walker(*i);
             writer.write(walker);
         }
     }
-    catch (const exception& e)
+    catch (const std::exception& e)
     {
         LOG_FATAL(
             logger,

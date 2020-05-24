@@ -59,17 +59,16 @@
 #include "renderer/utility/transformsequence.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/matrix.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/iostreamop.h"
 
 // Standard headers.
 #include <cstddef>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -1033,7 +1032,7 @@ auto_release_ptr<Project> CornellBoxProjectFactory::create()
         EnvironmentFactory::create(
             "environment",
             ParamArray()
-                .insert("environment_shader", "environment_shader")));    
+                .insert("environment_shader", "environment_shader")));
 
     //
     // Frame.

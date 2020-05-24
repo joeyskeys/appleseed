@@ -38,23 +38,28 @@ import subprocess
 import sys
 import urllib
 
+# We can't import modules from parent directories without modifying sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+import utils
 
-#--------------------------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------------------------
 # Constants.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
-DEFAULT_TOOL_FILEPATH = "..\\..\\sandbox\\bin\\Release\\appleseed.cli.exe" if os.name == "nt" else \
-                        "../../sandbox/bin/Release/appleseed.cli"
+VERSION = "1.0"
 
 APPLESEED_BASE_ARGS = ""
 
 VALUE_THRESHOLD = 2                 # max allowed absolute diff between two pixel components, in [0, 255]
 MAX_DIFFERING_COMPONENTS = 4 * 2    # max number of pixel components that are allowed to differ significantly
 
+CURRENT_TIME = datetime.datetime.now()
 
-#--------------------------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------------------------
 # Utilities.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def remove_prefix(text, prefix):
     return text[len(prefix):] if text.startswith(prefix) else text
@@ -113,9 +118,9 @@ def write_rgba_png_file(filepath, rows):
         writer.write(file, rows)
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Utility class to log progress.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 class Logger:
 
@@ -171,9 +176,9 @@ class Logger:
                                          colorama.Fore.RESET))
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Utility class to generate an HTML report.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 class ReportWriter:
 
@@ -231,8 +236,13 @@ class ReportWriter:
         self.file.flush()
 
     def __write_header(self, args):
+        script_path = os.path.realpath(__file__)
+
         self.file.write(self.__render(self.header_template,
-                                      {'test-date': datetime.datetime.now(),
+                                      {'test-date': CURRENT_TIME,
+                                       'python-version': utils.get_python_version(),
+                                       'script-path': script_path,
+                                       'script-version': VERSION,
                                        'appleseed-binary-path': args.tool_path,
                                        'max-abs-diff-allowed': VALUE_THRESHOLD,
                                        'max-diff-comps-count-allowed': MAX_DIFFERING_COMPONENTS}))
@@ -254,9 +264,9 @@ class ReportWriter:
             return 'cp "{0}" "{1}"'.format(output_filepath, reference_filepath)
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Render a given project file.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def render_project_file(args, project_filepath, output_filepath, log_filepath):
     with open(log_filepath, "w", 0) as log_file:
@@ -280,13 +290,13 @@ def render_project_file(args, project_filepath, output_filepath, log_filepath):
         return result == 0, end_time - start_time
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Compare two images.
 # Returns a (num_diff, max_diff, diff_image) where:
 #   num_diff is the number of components whose absolute difference is larger than value_threshold
 #   max_diff is the maximum absolute difference between two components
 #   diff_image is the difference between the two images
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def compare_images(rows1, rows2, value_threshold):
     num_diff = 0
@@ -353,11 +363,11 @@ def transform_to_false_color(rows):
             row[i + 3] = 255
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Render a given test scene.
 # Return True if the test scene passed, False if it failed to render, or if the output does not
 # match the reference image.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def render_test_scene(args, logger, report_writer, project_directory, project_filename):
     project_basename = os.path.splitext(project_filename)[0]
@@ -436,10 +446,10 @@ def render_test_scene(args, logger, report_writer, project_directory, project_fi
     return True
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Render all test scenes in a given directory (possibly recursively).
 # Returns the number of rendered and passing test scenes.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def render_test_scenes(script_directory, args):
     rendered_scene_count = 0
@@ -474,15 +484,22 @@ def render_test_scenes(script_directory, args):
     return rendered_scene_count, passing_scene_count
 
 
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Entry point.
-#--------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
+
+def print_configuration(appleseed_path, appleseed_args):
+    print("Configuration:")
+    print("  Binary         : {0}".format(appleseed_path))
+    print("  Arguments      : {0}".format(appleseed_args))
+    print()
+
 
 def main():
     colorama.init()
 
     parser = argparse.ArgumentParser(description="run the functional test suite.")
-    parser.add_argument("-t", "--tool-path", metavar="tool-path",
+    parser.add_argument("-t", "--tool-path", required=True, metavar="tool-path",
                         help="set the path to the appleseed.cli tool")
     parser.add_argument("-r", "--recursive", action='store_true', dest="recursive",
                         help="scan the specified directory and all its subdirectories")
@@ -493,19 +510,17 @@ def main():
     parser.add_argument("directory", nargs='?', default=".", help="directory to scan")
     args = parser.parse_args()
 
-    script_directory = os.path.dirname(os.path.realpath(__file__))
+    if not os.path.isfile(args.tool_path):
+        sys.exit("Error: The given path to appleseed.cli does not exist.")
 
-    if args.tool_path is None:
-        args.tool_path = os.path.join(script_directory, DEFAULT_TOOL_FILEPATH)
+    script_directory = os.path.dirname(os.path.realpath(__file__))
 
     appleseed_args = APPLESEED_BASE_ARGS
     if args.args:
         appleseed_args += " {0}".format(" ".join(args.args))
 
-    print("Configuration:")
-    print("  Binary        : {0}".format(args.tool_path))
-    print("  Arguments     : {0}".format(appleseed_args))
-    print()
+    utils.print_runtime_details("runtestsuite", VERSION, os.path.realpath(__file__), CURRENT_TIME)
+    print_configuration(args.tool_path, appleseed_args)
 
     start_time = datetime.datetime.now()
     rendered_scene_count, passing_scene_count = render_test_scenes(script_directory, args)
@@ -515,16 +530,17 @@ def main():
 
     print()
     print("Results:")
-    print("  Success Rate  : {0}{1:.2f} %{2}"
+    print("  Success Rate   : {0}{1:.2f} %{2}"
           .format(colorama.Fore.RED if passing_scene_count < rendered_scene_count else colorama.Fore.GREEN,
                   success,
                   colorama.Fore.RESET))
-    print("  Failures      : {0}{1} out of {2} test scene(s){3}"
+    print("  Failures       : {0}{1} out of {2} test scene(s){3}"
           .format(colorama.Fore.RED if passing_scene_count < rendered_scene_count else colorama.Fore.GREEN,
                   rendered_scene_count - passing_scene_count,
                   rendered_scene_count,
                   colorama.Fore.RESET))
-    print("  Total Time    : {0}".format(format_duration(end_time - start_time)))
+    print("  Total Time     : {0}".format(format_duration(end_time - start_time)))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

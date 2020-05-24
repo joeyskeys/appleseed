@@ -35,21 +35,22 @@
 #include "renderer/modeling/input/source.h"
 #include "renderer/modeling/input/texturesource.h"
 #include "renderer/modeling/texture/texture.h"
+#include "renderer/modeling/texture/tileptr.h"
 #include "renderer/utility/messagecontext.h"
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/colorspace.h"
 #include "foundation/image/genericprogressiveimagefilereader.h"
 #include "foundation/image/tile.h"
 #include "foundation/platform/thread.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/makevector.h"
 #include "foundation/utility/searchpaths.h"
-#include "foundation/utility/string.h"
 #include "foundation/utility/uid.h"
 
 // Standard headers.
@@ -57,7 +58,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -84,11 +84,11 @@ namespace
             const EntityDefMessageContext context("texture", this);
 
             // Establish and store the qualified path to the texture file.
-            m_filepath = to_string(search_paths.qualify(m_params.get_required<string>("filename", "")));
+            m_filepath = to_string(search_paths.qualify(m_params.get_required<std::string>("filename", "")));
 
             // Retrieve the color space.
-            const string color_space =
-                m_params.get_required<string>(
+            const std::string color_space =
+                m_params.get_required<std::string>(
                     "color_space",
                     "linear_rgb",
                     make_vector("linear_rgb", "srgb", "ciexyz"),
@@ -110,14 +110,17 @@ namespace
             return Model;
         }
 
-        void on_frame_end(
+        void on_render_end(
             const Project&          project,
             const BaseGroup*        parent) override
         {
             if (m_reader.is_open())
+            {
+                RENDERER_LOG_INFO("closing texture file %s...", m_filepath.c_str());
                 m_reader.close();
+            }
 
-            Texture::on_frame_end(project, parent);
+            Texture::on_render_end(project, parent);
         }
 
         ColorSpace get_color_space() const override
@@ -154,25 +157,17 @@ namespace
             return new TextureSource(assembly_uid, texture_instance);
         }
 
-        Tile* load_tile(
+        TilePtr load_tile(
             const size_t            tile_x,
             const size_t            tile_y) override
         {
             boost::mutex::scoped_lock lock(m_mutex);
             open_image_file();
-            return m_reader.read_tile(tile_x, tile_y);
-        }
-
-        void unload_tile(
-            const size_t            tile_x,
-            const size_t            tile_y,
-            const Tile*             tile) override
-        {
-            delete tile;
+            return TilePtr::make_owning(m_reader.read_tile(tile_x, tile_y));
         }
 
       private:
-        string                              m_filepath;
+        std::string                         m_filepath;
         ColorSpace                          m_color_space;
 
         mutable boost::mutex                m_mutex;

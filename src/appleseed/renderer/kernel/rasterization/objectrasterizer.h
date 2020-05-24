@@ -31,6 +31,9 @@
 // appleseed.main headers.
 #include "main/dllsymbol.h"
 
+// Standard headers.
+#include <cstddef>
+
 namespace renderer
 {
 
@@ -39,7 +42,7 @@ class APPLESEED_DLLSYMBOL ObjectRasterizer
   public:
     virtual ~ObjectRasterizer() {}
 
-    virtual void begin_object() = 0;
+    virtual void begin_object(const size_t triangle_count_hint) = 0;
     virtual void end_object() = 0;
 
     struct Triangle

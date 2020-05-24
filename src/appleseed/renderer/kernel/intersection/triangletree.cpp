@@ -60,16 +60,17 @@
 #include "foundation/math/transform.h"
 #include "foundation/math/treeoptimizer.h"
 #include "foundation/math/vector.h"
+#include "foundation/memory/alignedallocator.h"
+#include "foundation/memory/memory.h"
 #include "foundation/platform/system.h"
 #include "foundation/platform/timers.h"
-#include "foundation/utility/alignedallocator.h"
+#include "foundation/platform/types.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/makevector.h"
-#include "foundation/utility/memory.h"
 #include "foundation/utility/statistics.h"
 #include "foundation/utility/stopwatch.h"
-#include "foundation/utility/string.h"
 
 // Standard headers.
 #include <algorithm>
@@ -78,7 +79,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -104,16 +104,16 @@ namespace
 
     template <typename AABBType>
     void collect_static_triangles(
-        const GAABB3&                   tree_bbox,
-        const ObjectInstance&           object_instance,
-        const size_t                    object_instance_index,
-        const StaticTriangleTess&       tess,
-        const bool                      save_memory,
-        vector<TriangleKey>*            triangle_keys,
-        vector<TriangleVertexInfo>*     triangle_vertex_infos,
-        vector<GVector3>*               triangle_vertices,
-        vector<AABBType>*               triangle_bboxes,
-        size_t&                         triangle_vertex_count)
+        const GAABB3&                        tree_bbox,
+        const ObjectInstance&                object_instance,
+        const size_t                         object_instance_index,
+        const StaticTriangleTess&            tess,
+        const bool                           save_memory,
+        std::vector<TriangleKey>*            triangle_keys,
+        std::vector<TriangleVertexInfo>*     triangle_vertex_infos,
+        std::vector<GVector3>*               triangle_vertices,
+        std::vector<AABBType>*               triangle_bboxes,
+        size_t&                              triangle_vertex_count)
     {
         const Transformd& transform = object_instance.get_transform();
         const size_t triangle_count = tess.m_primitives.size();
@@ -198,17 +198,17 @@ namespace
 
     template <typename AABBType>
     void collect_moving_triangles(
-        const GAABB3&                   tree_bbox,
-        const ObjectInstance&           object_instance,
-        const size_t                    object_instance_index,
-        const StaticTriangleTess&       tess,
-        const double                    time,
-        const bool                      save_memory,
-        vector<TriangleKey>*            triangle_keys,
-        vector<TriangleVertexInfo>*     triangle_vertex_infos,
-        vector<GVector3>*               triangle_vertices,
-        vector<AABBType>*               triangle_bboxes,
-        size_t&                         triangle_vertex_count)
+        const GAABB3&                        tree_bbox,
+        const ObjectInstance&                object_instance,
+        const size_t                         object_instance_index,
+        const StaticTriangleTess&            tess,
+        const double                         time,
+        const bool                           save_memory,
+        std::vector<TriangleKey>*            triangle_keys,
+        std::vector<TriangleVertexInfo>*     triangle_vertex_infos,
+        std::vector<GVector3>*               triangle_vertices,
+        std::vector<AABBType>*               triangle_bboxes,
+        size_t&                              triangle_vertex_count)
     {
         const Transformd& transform = object_instance.get_transform();
         const size_t motion_segment_count = tess.get_motion_segment_count();
@@ -223,7 +223,7 @@ namespace
             increase_capacity(triangle_bboxes, triangle_count);
         }
 
-        vector<GAABB3> tri_pose_bboxes(motion_segment_count + 1);
+        std::vector<GAABB3> tri_pose_bboxes(motion_segment_count + 1);
 
         for (size_t i = 0; i < triangle_count; ++i)
         {
@@ -316,13 +316,13 @@ namespace
 
     template <typename AABBType>
     void collect_triangles(
-        const TriangleTree::Arguments&  arguments,
-        const double                    time,
-        const bool                      save_memory,
-        vector<TriangleKey>*            triangle_keys,
-        vector<TriangleVertexInfo>*     triangle_vertex_infos,
-        vector<GVector3>*               triangle_vertices,
-        vector<AABBType>*               triangle_bboxes)
+        const TriangleTree::Arguments&       arguments,
+        const double                         time,
+        const bool                           save_memory,
+        std::vector<TriangleKey>*            triangle_keys,
+        std::vector<TriangleVertexInfo>*     triangle_vertex_infos,
+        std::vector<GVector3>*               triangle_vertices,
+        std::vector<AABBType>*               triangle_bboxes)
     {
         assert_empty(triangle_keys);
         assert_empty(triangle_vertex_infos);
@@ -402,7 +402,7 @@ TriangleTree::TriangleTree(const Arguments& arguments)
     const MessageContext message_context(
         format("while building triangle tree for assembly \"{0}\"", m_arguments.m_assembly.get_path()));
     const ParamArray& params = m_arguments.m_assembly.get_parameters().child("acceleration_structure");
-    const string algorithm = params.get_optional<string>("algorithm", "bvh", make_vector("bvh", "sbvh"), message_context);
+    const std::string algorithm = params.get_optional<std::string>("algorithm", "bvh", make_vector("bvh", "sbvh"), message_context);
     const double time = params.get_optional<double>("time", 0.5);
     const bool save_memory = params.get_optional<bool>("save_temporary_memory", false);
 
@@ -456,7 +456,7 @@ size_t TriangleTree::get_memory_size() const
         - sizeof(*static_cast<const TreeType*>(this))
         + sizeof(*this)
         + m_triangle_keys.capacity() * sizeof(TriangleKey)
-        + m_leaf_data.capacity() * sizeof(uint8);
+        + m_leaf_data.capacity() * sizeof(std::uint8_t);
 }
 
 namespace
@@ -480,7 +480,7 @@ namespace
 
     #define RENDERER_LOG_VECTOR_STATS(vec) print_vector_stats(#vec, vec)
 
-    size_t count_static_triangles(const vector<TriangleVertexInfo>& info)
+    size_t count_static_triangles(const std::vector<TriangleVertexInfo>& info)
     {
         size_t count = 0;
 
@@ -508,9 +508,9 @@ void TriangleTree::build_bvh(
         m_arguments.m_triangle_tree_uid,
         m_arguments.m_assembly.get_path().c_str());
     stopwatch.start();
-    vector<TriangleKey> triangle_keys;
-    vector<TriangleVertexInfo> triangle_vertex_infos;
-    vector<GAABB3> triangle_bboxes;
+    std::vector<TriangleKey> triangle_keys;
+    std::vector<TriangleVertexInfo> triangle_vertex_infos;
+    std::vector<GAABB3> triangle_bboxes;
     collect_triangles(
         m_arguments,
         time,
@@ -540,7 +540,7 @@ void TriangleTree::build_bvh(
     const GScalar triangle_intersection_cost = params.get_optional<GScalar>("triangle_intersection_cost", TriangleTreeDefaultTriangleIntersectionCost);
 
     // Create the partitioner.
-    typedef bvh::SAHPartitioner<vector<GAABB3>> Partitioner;
+    typedef bvh::SAHPartitioner<std::vector<GAABB3>> Partitioner;
     Partitioner partitioner(
         triangle_bboxes,
         max_leaf_size,
@@ -564,7 +564,7 @@ void TriangleTree::build_bvh(
     clear_release_memory(triangle_bboxes);
 
     // Collect triangle vertices.
-    vector<GVector3> triangle_vertices;
+    std::vector<GVector3> triangle_vertices;
     collect_triangles<GAABB3>(
         m_arguments,
         time,
@@ -609,10 +609,10 @@ void TriangleTree::build_sbvh(
         "collecting geometry for triangle tree #" FMT_UNIQUE_ID " from assembly \"%s\"...",
         m_arguments.m_triangle_tree_uid,
         m_arguments.m_assembly.get_path().c_str());
-    vector<TriangleKey> triangle_keys;
-    vector<TriangleVertexInfo> triangle_vertex_infos;
-    vector<GVector3> triangle_vertices;
-    vector<AABB3d> triangle_bboxes;
+    std::vector<TriangleKey> triangle_keys;
+    std::vector<TriangleVertexInfo> triangle_vertex_infos;
+    std::vector<GVector3> triangle_vertices;
+    std::vector<AABB3d> triangle_bboxes;
     stopwatch.start();
     collect_triangles(
         m_arguments,
@@ -644,7 +644,7 @@ void TriangleTree::build_sbvh(
     const GScalar triangle_intersection_cost = params.get_optional<GScalar>("triangle_intersection_cost", TriangleTreeDefaultTriangleIntersectionCost);
 
     // Create the partitioner.
-    typedef bvh::SBVHPartitioner<TriangleItemHandler, vector<AABB3d>> Partitioner;
+    typedef bvh::SBVHPartitioner<TriangleItemHandler, std::vector<AABB3d>> Partitioner;
     TriangleItemHandler triangle_handler(
         triangle_vertex_infos,
         triangle_vertices,
@@ -752,24 +752,24 @@ namespace
 #endif
 }
 
-vector<GAABB3> TriangleTree::compute_motion_bboxes(
-    const vector<size_t>&               triangle_indices,
-    const vector<TriangleVertexInfo>&   triangle_vertex_infos,
-    const vector<GVector3>&             triangle_vertices,
-    const size_t                        node_index)
+std::vector<GAABB3> TriangleTree::compute_motion_bboxes(
+    const std::vector<size_t>&               triangle_indices,
+    const std::vector<TriangleVertexInfo>&   triangle_vertex_infos,
+    const std::vector<GVector3>&             triangle_vertices,
+    const size_t                             node_index)
 {
     NodeType& node = m_nodes[node_index];
 
     if (node.is_interior())
     {
-        const vector<GAABB3> left_bboxes =
+        const std::vector<GAABB3> left_bboxes =
             compute_motion_bboxes(
                 triangle_indices,
                 triangle_vertex_infos,
                 triangle_vertices,
                 node.get_child_node_index() + 0);
 
-        const vector<GAABB3> right_bboxes =
+        const std::vector<GAABB3> right_bboxes =
             compute_motion_bboxes(
                 triangle_indices,
                 triangle_vertex_infos,
@@ -783,7 +783,7 @@ vector<GAABB3> TriangleTree::compute_motion_bboxes(
         {
             node.set_left_bbox_index(m_node_bboxes.size());
 
-            for (vector<GAABB3>::const_iterator i = left_bboxes.begin(); i != left_bboxes.end(); ++i)
+            for (std::vector<GAABB3>::const_iterator i = left_bboxes.begin(); i != left_bboxes.end(); ++i)
                 m_node_bboxes.push_back(swizzle(AABB3d(*i)));
         }
 
@@ -791,12 +791,12 @@ vector<GAABB3> TriangleTree::compute_motion_bboxes(
         {
             node.set_right_bbox_index(m_node_bboxes.size());
 
-            for (vector<GAABB3>::const_iterator i = right_bboxes.begin(); i != right_bboxes.end(); ++i)
+            for (std::vector<GAABB3>::const_iterator i = right_bboxes.begin(); i != right_bboxes.end(); ++i)
                 m_node_bboxes.push_back(swizzle(AABB3d(*i)));
         }
 
-        const size_t bbox_count = max(left_bboxes.size(), right_bboxes.size());
-        vector<GAABB3> bboxes(bbox_count);
+        const size_t bbox_count = std::max(left_bboxes.size(), right_bboxes.size());
+        std::vector<GAABB3> bboxes(bbox_count);
 
         for (size_t i = 0; i < bbox_count; ++i)
         {
@@ -831,7 +831,7 @@ vector<GAABB3> TriangleTree::compute_motion_bboxes(
             base_pose_bbox.insert(triangle_vertices[vertex_info.m_vertex_index + 2]);
         }
 
-        vector<GAABB3> bboxes(max_motion_segment_count + 1);
+        std::vector<GAABB3> bboxes(max_motion_segment_count + 1);
         bboxes[0] = base_pose_bbox;
 
         if (max_motion_segment_count > 0)
@@ -876,11 +876,11 @@ vector<GAABB3> TriangleTree::compute_motion_bboxes(
 }
 
 void TriangleTree::store_triangles(
-    const vector<size_t>&               triangle_indices,
-    const vector<TriangleVertexInfo>&   triangle_vertex_infos,
-    const vector<GVector3>&             triangle_vertices,
-    const vector<TriangleKey>&          triangle_keys,
-    Statistics&                         statistics)
+    const std::vector<size_t>&               triangle_indices,
+    const std::vector<TriangleVertexInfo>&   triangle_vertex_infos,
+    const std::vector<GVector3>&             triangle_vertices,
+    const std::vector<TriangleKey>&          triangle_keys,
+    Statistics&                              statistics)
 {
     const size_t node_count = m_nodes.size();
 
@@ -945,11 +945,11 @@ void TriangleTree::store_triangles(
                     item_begin,
                     item_count);
 
-            MemoryWriter user_data_writer(&node.get_user_data<uint8>());
+            MemoryWriter user_data_writer(&node.get_user_data<std::uint8_t>());
 
-            if (leaf_size <= NodeType::MaxUserDataSize - sizeof(uint32))
+            if (leaf_size <= NodeType::MaxUserDataSize - sizeof(std::uint32_t))
             {
-                user_data_writer.write<uint32>(~uint32(0));
+                user_data_writer.write<std::uint32_t>(~std::uint32_t(0));
 
                 TriangleEncoder::encode(
                     triangle_vertex_infos,
@@ -961,7 +961,7 @@ void TriangleTree::store_triangles(
             }
             else
             {
-                user_data_writer.write(static_cast<uint32>(leaf_data_writer.offset()));
+                user_data_writer.write(static_cast<std::uint32_t>(leaf_data_writer.offset()));
 
                 TriangleEncoder::encode(
                     triangle_vertex_infos,
@@ -1063,9 +1063,9 @@ namespace
     };
 
     // Hash a filter key.
-    uint64 hash(const FilterKey& key)
+    std::uint64_t hash(const FilterKey& key)
     {
-        uint64 h = key.m_object->compute_signature();
+        std::uint64_t h = key.m_object->compute_signature();
 
         for (size_t i = 0; i < key.m_materials.size(); ++i)
         {
@@ -1078,9 +1078,9 @@ namespace
         return h;
     }
 
-    typedef set<size_t> IndexSet;
-    typedef set<FilterKey> FilterKeySet;
-    typedef map<size_t, const FilterKey*> IndexToFilterKeyMap;
+    typedef std::set<size_t> IndexSet;
+    typedef std::set<FilterKey> FilterKeySet;
+    typedef std::map<size_t, const FilterKey*> IndexToFilterKeyMap;
 
     // Collect the set of object instances contained in an assembly.
     void collect_object_instances(
@@ -1148,7 +1148,7 @@ namespace
                 continue;
 
             // Update existing intersection filters.
-            const uint64 filter_key_hash = hash(filter_key);
+            const std::uint64_t filter_key_hash = hash(filter_key);
             const IntersectionFilterRepository::const_iterator it = filters.find(filter_key_hash);
             if (it != filters.end())
             {
@@ -1160,7 +1160,7 @@ namespace
             }
 
             // Create an intersection filter for this key.
-            unique_ptr<IntersectionFilter> intersection_filter(
+            std::unique_ptr<IntersectionFilter> intersection_filter(
                 new IntersectionFilter(
                     *filter_key.m_object,
                     filter_key.m_materials,
@@ -1193,14 +1193,14 @@ namespace
         if (repository.empty())
             return;
 
-        set<uint64> hashes;
+        std::set<std::uint64_t> hashes;
 
         for (const_each<FilterKeySet> i = filter_keys; i; ++i)
             hashes.insert(hash(*i));
 
         for (IntersectionFilterRepository::iterator i = repository.begin(); i != repository.end(); )
         {
-            const uint64 filter_key_hash = i->first;
+            const std::uint64_t filter_key_hash = i->first;
 
             if (hashes.find(filter_key_hash) == hashes.end())
             {
@@ -1216,10 +1216,10 @@ namespace
     }
 
     void map_object_instances_to_intersection_filters(
-        const IndexSet&                     object_instances,
-        const IndexToFilterKeyMap&          object_instances_to_filter_keys,
-        const IntersectionFilterRepository& repository,
-        vector<const IntersectionFilter*>&  filters)
+        const IndexSet&                          object_instances,
+        const IndexToFilterKeyMap&               object_instances_to_filter_keys,
+        const IntersectionFilterRepository&      repository,
+        std::vector<const IntersectionFilter*>&  filters)
     {
         if (!object_instances.empty())
         {
@@ -1301,9 +1301,9 @@ TriangleTreeFactory::TriangleTreeFactory(const TriangleTree::Arguments& argument
 {
 }
 
-unique_ptr<TriangleTree> TriangleTreeFactory::create()
+std::unique_ptr<TriangleTree> TriangleTreeFactory::create()
 {
-    return unique_ptr<TriangleTree>(new TriangleTree(m_arguments));
+    return std::unique_ptr<TriangleTree>(new TriangleTree(m_arguments));
 }
 
 
@@ -1360,11 +1360,11 @@ bool TriangleLeafVisitor::visit(
     )
 {
     // Retrieve the pointer to the data of this leaf.
-    const uint8* user_data = &node.get_user_data<uint8>();
-    const uint32 leaf_data_index = *reinterpret_cast<const uint32*>(user_data);
-    const uint8* leaf_data =
-        leaf_data_index == ~uint32(0)
-            ? user_data + sizeof(uint32)                // triangles are stored in the leaf node
+    const std::uint8_t* user_data = &node.get_user_data<std::uint8_t>();
+    const std::uint32_t leaf_data_index = *reinterpret_cast<const std::uint32_t*>(user_data);
+    const std::uint8_t* leaf_data =
+        leaf_data_index == ~std::uint32_t(0)
+            ? user_data + sizeof(std::uint32_t)         // triangles are stored in the leaf node
             : &m_tree.m_leaf_data[leaf_data_index];     // triangles are stored in the tree
     MemoryReader reader(leaf_data);
 
@@ -1377,10 +1377,10 @@ bool TriangleLeafVisitor::visit(
         FOUNDATION_BVH_TRAVERSAL_STATS(stats.m_intersected_items.insert(1));
 
         // Retrieve the triangle's visibility flags.
-        const uint32 vis_flags = reader.read<uint32>();
+        const std::uint32_t vis_flags = reader.read<std::uint32_t>();
 
         // Retrieve the number of motion segments for this triangle.
-        const uint32 motion_segment_count = reader.read<uint32>();
+        const std::uint32_t motion_segment_count = reader.read<std::uint32_t>();
 
         // todo: get rid of this test by sorting triangles by their number of motion segments.
         if (motion_segment_count == 0)
@@ -1514,11 +1514,11 @@ bool TriangleLeafProbeVisitor::visit(
     )
 {
     // Retrieve the pointer to the data of this leaf.
-    const uint8* user_data = &node.get_user_data<uint8>();
-    const uint32 leaf_data_index = *reinterpret_cast<const uint32*>(user_data);
-    const uint8* leaf_data =
-        leaf_data_index == ~uint32(0)
-            ? user_data + sizeof(uint32)                // triangles are stored in the leaf node
+    const std::uint8_t* user_data = &node.get_user_data<std::uint8_t>();
+    const std::uint32_t leaf_data_index = *reinterpret_cast<const std::uint32_t*>(user_data);
+    const std::uint8_t* leaf_data =
+        leaf_data_index == ~std::uint32_t(0)
+            ? user_data + sizeof(std::uint32_t)         // triangles are stored in the leaf node
             : &m_tree.m_leaf_data[leaf_data_index];     // triangles are stored in the tree
     MemoryReader reader(leaf_data);
 
@@ -1528,10 +1528,10 @@ bool TriangleLeafProbeVisitor::visit(
         FOUNDATION_BVH_TRAVERSAL_STATS(stats.m_intersected_items.insert(1));
 
         // Retrieve the triangle's visibility flags.
-        const uint32 vis_flags = reader.read<uint32>();
+        const std::uint32_t vis_flags = reader.read<std::uint32_t>();
 
         // Retrieve the number of motion segments for this triangle.
-        const uint32 motion_segment_count = reader.read<uint32>();
+        const std::uint32_t motion_segment_count = reader.read<std::uint32_t>();
 
         // todo: get rid of this test by sorting triangles by their number of motion segments.
         if (motion_segment_count == 0)

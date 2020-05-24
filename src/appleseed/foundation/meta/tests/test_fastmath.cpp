@@ -46,7 +46,6 @@
 #include <vector>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Math_FastMath)
 {
@@ -55,8 +54,8 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         return
             ref == T(0.0)
-                ? abs(value)
-                : abs((ref - value) / ref);
+                ? std::abs(value)
+                : std::abs((ref - value) / ref);
     }
 
     template <typename T, typename Function>
@@ -118,14 +117,14 @@ TEST_SUITE(Foundation_Math_FastMath)
     template <typename Function>
     struct FuncDef
     {
-        string      m_title;
-        string      m_color;
-        Function    m_function;
+        std::string      m_title;
+        std::string      m_color;
+        Function         m_function;
     };
 
     template <typename T, typename Function>
     void plot_functions(
-        const string&           filepath,
+        const std::string&      filepath,
         const FuncDef<Function> functions[],
         const size_t            function_count,
         const T                 low,
@@ -136,7 +135,7 @@ TEST_SUITE(Foundation_Math_FastMath)
 
         for (size_t f = 0; f < function_count; ++f)
         {
-            vector<Vector<T, 2>> points(step_count);
+            std::vector<Vector<T, 2>> points(step_count);
 
             for (size_t i = 0; i < step_count; ++i)
             {
@@ -156,18 +155,18 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // Pow2(x).
+    // 2^x
     //
 
     float scalar_std_pow2(const float x)
     {
-        return pow(2.0f, x);
+        return std::pow(2.0f, x);
     }
 
     void vector_std_pow2(float x[4])
     {
         for (size_t i = 0; i < 4; ++i)
-            x[i] = pow(2.0f, x[i]);
+            x[i] = std::pow(2.0f, x[i]);
     }
 
     TEST_CASE(ScalarFastPow2)
@@ -235,24 +234,24 @@ TEST_SUITE(Foundation_Math_FastMath)
             "unit tests/outputs/test_fastmath_pow2.gnuplot",
             functions,
             countof(functions),
-            0.0f,
-            1.0f,
-            1000);
+            -2.0f,
+            +10.0f,
+            10000);
     }
 
     //
-    // Log2(x).
+    // log2(x)
     //
 
     float scalar_std_log2(const float x)
     {
-        return log(x) / log(2.0f);
+        return std::log(x) / std::log(2.0f);
     }
 
     void vector_std_log2(float x[4])
     {
         for (size_t i = 0; i < 4; ++i)
-            x[i] = log(x[i]) / log(2.0f);
+            x[i] = std::log(x[i]) / std::log(2.0f);
     }
 
     TEST_CASE(ScalarFastLog2)
@@ -326,14 +325,14 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // Pow(x).
+    // x^e
     //
 
     const float Exponent = 2.4f;
 
     float scalar_std_pow(const float x)
     {
-        return pow(x, Exponent);
+        return std::pow(x, Exponent);
     }
 
     float scalar_fast_pow(const float x)
@@ -349,7 +348,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     void vector_std_pow(float x[4])
     {
         for (size_t i = 0; i < 4; ++i)
-            x[i] = pow(x[i], Exponent);
+            x[i] = std::pow(x[i], Exponent);
     }
 
     void vector_fast_pow(float x[4])
@@ -433,20 +432,20 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // Log(x).
+    // log(x)
     //
 
     void vector_std_log(float x[4])
     {
         for (size_t i = 0; i < 4; ++i)
-            x[i] = log(x[i]);
+            x[i] = std::log(x[i]);
     }
 
     TEST_CASE(ScalarFastLog)
     {
         const float error =
             compute_avg_relative_error_scalar<float, float (*)(float)>(
-                log,
+                std::log,
                 fast_log,
                 1.0e-2f,
                 1.0f,
@@ -459,7 +458,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         const float error =
             compute_avg_relative_error_scalar<float, float (*)(float)>(
-                log,
+                std::log,
                 faster_log,
                 1.0e-2f,
                 1.0f,
@@ -498,7 +497,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         const FuncDef<float (*)(float)> functions[] =
         {
-            { "std::log", "black", log },
+            { "std::log", "black", std::log },
             { "foundation::fast_log", "green", fast_log },
             { "foundation::faster_log", "red", faster_log }
         };
@@ -513,20 +512,20 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // Exp(x).
+    // exp(x)
     //
 
     void vector_std_exp(float x[4])
     {
         for (size_t i = 0; i < 4; ++i)
-            x[i] = exp(x[i]);
+            x[i] = std::exp(x[i]);
     }
 
     TEST_CASE(ScalarFastExp)
     {
         const float error =
             compute_avg_relative_error_scalar<float, float (*)(float)>(
-                exp,
+                std::exp,
                 fast_exp,
                 0.0f,
                 1.0f,
@@ -539,7 +538,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         const float error =
             compute_avg_relative_error_scalar<float, float (*)(float)>(
-                exp,
+                std::exp,
                 faster_exp,
                 0.0f,
                 1.0f,
@@ -578,7 +577,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         const FuncDef<float (*)(float)> functions[] =
         {
-            { "std::exp", "black", exp },
+            { "std::exp", "black", std::exp },
             { "foundation::fast_exp", "green", fast_exp },
             { "foundation::faster_exp", "red", faster_exp }
         };
@@ -587,13 +586,34 @@ TEST_SUITE(Foundation_Math_FastMath)
             "unit tests/outputs/test_fastmath_exp.gnuplot",
             functions,
             countof(functions),
-            0.0f,
-            1.0f,
+            -2.0f,
+            +10.0f,
+            10000);
+    }
+
+    // 
+    // acos(x)
+    //
+
+    TEST_CASE(PlotAcosFunctions)
+    {
+        const FuncDef<float (*)(float)> functions[] =
+        {
+            { "std::acos", "black", std::acos },
+            { "foundation::fast_acos", "green", fast_acos }
+        };
+
+        plot_functions(
+            "unit tests/outputs/test_fastmath_acos.gnuplot",
+            functions,
+            countof(functions),
+            -1.0f,
+            +1.0f,
             1000);
     }
 
     //
-    // Rcp(x).
+    // 1/x
     //
 
     TEST_CASE(ScalarFastRcp)
@@ -627,14 +647,14 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // Sqrt(x).
+    // sqrt(x)
     //
 
     TEST_CASE(ScalarFastSqrt)
     {
         const float error =
             compute_avg_relative_error_scalar<float, float (*)(float)>(
-                sqrt,
+                std::sqrt,
                 fast_sqrt,
                 0.0f,
                 1.0f,
@@ -647,7 +667,7 @@ TEST_SUITE(Foundation_Math_FastMath)
     {
         const FuncDef<float (*)(float)> functions[] =
         {
-            { "std::sqrt", "black", sqrt },
+            { "std::sqrt", "black", std::sqrt },
             { "foundation::fast_sqrt", "green", fast_sqrt }
         };
 
@@ -661,12 +681,12 @@ TEST_SUITE(Foundation_Math_FastMath)
     }
 
     //
-    // RcpSqrt(x).
+    // 1/sqrt(x)
     //
 
     float rcp_sqrt(const float x)
     {
-        return 1.0f / sqrt(x);
+        return 1.0f / std::sqrt(x);
     }
 
     TEST_CASE(ScalarFastRcpSqrt)

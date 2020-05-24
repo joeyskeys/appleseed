@@ -44,7 +44,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -90,7 +89,7 @@ BackwardLightSampler::BackwardLightSampler(
   : LightSamplerBase(params)
 {
     // Read which sampling algorithm should be used.
-    m_use_light_tree = params.get_optional<string>("algorithm", "cdf") == "lighttree";
+    m_use_light_tree = params.get_optional<std::string>("algorithm", "cdf") == "lighttree";
 
     RENDERER_LOG_INFO("collecting light emitters...");
 
@@ -146,7 +145,7 @@ BackwardLightSampler::BackwardLightSampler(
                     importance_multiplier = edf->get_uncached_importance_multiplier();
 
                 // Compute the probability density of this shape.
-                const float shape_importance = m_params.m_importance_sampling ? static_cast<float>(area) : 1.0f;
+                const float shape_importance = m_params.m_importance_sampling ? area : 1.0f;
                 const float shape_prob = shape_importance * importance_multiplier;
 
                 // Insert the light-emitting shape into the CDF.
@@ -170,7 +169,7 @@ BackwardLightSampler::BackwardLightSampler(
         m_light_tree.reset(new LightTree(m_light_tree_lights, m_emitting_shapes));
 
         // Build the light tree.
-        const vector<size_t> tri_index_to_node_index = m_light_tree->build();
+        const std::vector<size_t> tri_index_to_node_index = m_light_tree->build();
         assert(tri_index_to_node_index.size() == m_emitting_shapes.size());
 
         // Associate light tree nodes to emitting shapes.
@@ -227,8 +226,6 @@ float BackwardLightSampler::evaluate_pdf(
     const ShadingPoint&                 light_shading_point,
     const ShadingPoint&                 surface_shading_point) const
 {
-    assert(light_shading_point.is_triangle_primitive());
-
     const EmittingShapeKey shape_key(
         light_shading_point.get_assembly_instance().get_uid(),
         light_shading_point.get_object_instance_index(),
@@ -246,12 +243,11 @@ float BackwardLightSampler::evaluate_pdf(
             ? m_light_tree->evaluate_node_pdf(
                 surface_shading_point,
                 shape->m_light_tree_node_index)
-            : shape->m_shape_prob;
+            : shape->evaluate_pdf_uniform();
 
-    const float pdf = shape_probability * shape->m_rcp_area;
-    assert(pdf >= 0.0f);
+    assert(shape_probability >= 0.0f);
 
-    return pdf;
+    return shape_probability;
 }
 
 void BackwardLightSampler::sample_light_tree(

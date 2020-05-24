@@ -50,6 +50,7 @@
 #include "renderer/modeling/scene/containers.h"
 #include "renderer/modeling/scene/scene.h"
 #include "renderer/modeling/texture/texture.h"
+#include "renderer/modeling/texture/tileptr.h"
 #include "renderer/utility/paramarray.h"
 #include "renderer/utility/testutils.h"
 
@@ -61,8 +62,8 @@
 #include "foundation/image/tile.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
-#include "foundation/utility/arena.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/arena.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/test.h"
 #include "foundation/utility/uid.h"
 
@@ -83,7 +84,6 @@
 
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 TEST_SUITE(Renderer_Modeling_EnvironmentEDF)
 {
@@ -136,26 +136,18 @@ TEST_SUITE(Renderer_Modeling_EnvironmentEDF)
             return new TextureSource(assembly_uid, texture_instance);
         }
 
-        Tile* load_tile(
+        TilePtr load_tile(
             const size_t            tile_x,
             const size_t            tile_y) override
         {
             assert(tile_x == 0);
             assert(tile_y == 0);
-
-            return m_tile.get();
-        }
-
-        void unload_tile(
-            const size_t            tile_x,
-            const size_t            tile_y,
-            const Tile*             tile) override
-        {
+            return TilePtr::make_non_owning(m_tile.get());
         }
 
       private:
         const CanvasProperties  m_props;
-        unique_ptr<Tile>        m_tile;
+        std::unique_ptr<Tile>   m_tile;
 
         void create_horizontal_gradient()
         {

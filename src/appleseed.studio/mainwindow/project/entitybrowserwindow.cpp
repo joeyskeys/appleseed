@@ -33,12 +33,12 @@
 // UI definition header.
 #include "ui_entitybrowserwindow.h"
 
-// appleseed.studio headers.
+// appleseed.qtcommon headers.
 #include "utility/interop.h"
 #include "utility/miscellaneous.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/foreach.h"
 
 // Qt headers.
@@ -52,15 +52,15 @@
 #include <Qt>
 #include <QWidget>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
 
 EntityBrowserWindow::EntityBrowserWindow(
     QWidget*                parent,
-    const string&           window_title)
+    const std::string&      window_title)
   : WindowBase(parent, "entity_browser_window")
   , m_ui(new Ui::EntityBrowserWindow())
 {
@@ -107,8 +107,8 @@ namespace
 }
 
 void EntityBrowserWindow::add_items_page(
-    const string&           page_name,
-    const string&           page_label,
+    const std::string&      page_name,
+    const std::string&      page_label,
     const StringDictionary& items)
 {
     QWidget* tab = new QWidget(m_ui->tab_widget);

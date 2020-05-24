@@ -38,25 +38,19 @@
 #include "renderer/utility/transformsequence.h"
 
 // appleseed.foundation headers.
-#include "foundation/image/canvasproperties.h"
-#include "foundation/image/image.h"
 #include "foundation/math/dual.h"
 #include "foundation/math/matrix.h"
 #include "foundation/math/transform.h"
 #include "foundation/math/vector.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/autoreleaseptr.h"
-
-// Standard headers.
-#include <cstddef>
 
 // Forward declarations.
 namespace foundation    { class IAbortSwitch; }
 namespace renderer      { class OnRenderBeginRecorder; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -175,10 +169,10 @@ namespace
             {
                 const Vector2d px(ndc.get_value() + ndc.get_dx());
                 const Vector2d py(ndc.get_value() + ndc.get_dy());
-                ray.m_rx.m_org = ray.m_org;
-                ray.m_ry.m_org = ray.m_org;
-                ray.m_rx.m_dir = normalize(transform.vector_to_parent(-ndc_to_camera(px)));
-                ray.m_ry.m_dir = normalize(transform.vector_to_parent(-ndc_to_camera(py)));
+                ray.m_rx_org = ray.m_org;
+                ray.m_ry_org = ray.m_org;
+                ray.m_rx_dir = normalize(transform.vector_to_parent(-ndc_to_camera(px)));
+                ray.m_ry_dir = normalize(transform.vector_to_parent(-ndc_to_camera(py)));
                 ray.m_has_differentials = true;
             }
         }
@@ -210,7 +204,7 @@ namespace
             // Compute the emitted importance.
             const Vector3d film_point = ndc_to_camera(ndc);
             const double square_dist_film_lens = square_norm(film_point);
-            const double dist_film_lens = sqrt(square_dist_film_lens);
+            const double dist_film_lens = std::sqrt(square_dist_film_lens);
             const double cos_theta = m_focal_length / dist_film_lens;
             const double solid_angle = m_pixel_area * cos_theta / square_dist_film_lens;
             importance = 1.0f / static_cast<float>(square_norm(outgoing) * solid_angle);

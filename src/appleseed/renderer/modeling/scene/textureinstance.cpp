@@ -34,15 +34,16 @@
 #include "renderer/global/globallogger.h"
 #include "renderer/modeling/scene/basegroup.h"
 #include "renderer/modeling/texture/texture.h"
+#include "renderer/modeling/texture/tileptr.h"
 #include "renderer/utility/messagecontext.h"
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/tile.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/makevector.h"
 
 // Standard headers.
@@ -50,7 +51,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -73,7 +73,7 @@ struct TextureInstance::Impl
 {
     // Order of data members impacts performance, preserve it.
     Transformf              m_transform;
-    string                  m_texture_name;
+    std::string             m_texture_name;
 };
 
 TextureInstance::TextureInstance(
@@ -95,22 +95,22 @@ TextureInstance::TextureInstance(
     const EntityDefMessageContext context("texture instance", this);
 
     // Retrieve the texture addressing mode.
-    const string addressing_mode =
-        m_params.get_optional<string>("addressing_mode", "wrap", make_vector("clamp", "wrap"), context);
+    const std::string addressing_mode =
+        m_params.get_optional<std::string>("addressing_mode", "wrap", make_vector("clamp", "wrap"), context);
     if (addressing_mode == "clamp")
         m_addressing_mode = TextureAddressingClamp;
     else m_addressing_mode = TextureAddressingWrap;
 
     // Retrieve the texture filtering mode.
-    const string filtering_mode =
-        m_params.get_optional<string>("filtering_mode", "bilinear", make_vector("nearest", "bilinear"), context);
+    const std::string filtering_mode =
+        m_params.get_optional<std::string>("filtering_mode", "bilinear", make_vector("nearest", "bilinear"), context);
     if (filtering_mode == "nearest")
         m_filtering_mode = TextureFilteringNearest;
     else m_filtering_mode = TextureFilteringBilinear;
 
     // Retrieve the texture alpha mode.
-    const string alpha_mode =
-        m_params.get_optional<string>("alpha_mode", "alpha_channel", make_vector("alpha_channel", "luminance", "detect"), context);
+    const std::string alpha_mode =
+        m_params.get_optional<std::string>("alpha_mode", "alpha_channel", make_vector("alpha_channel", "luminance", "detect"), context);
     if (alpha_mode == "alpha_channel")
         m_alpha_mode = TextureAlphaModeAlphaChannel;
     else if (alpha_mode == "luminance")
@@ -131,7 +131,7 @@ void TextureInstance::release()
     delete this;
 }
 
-uint64 TextureInstance::compute_signature() const
+std::uint64_t TextureInstance::compute_signature() const
 {
     return
         m_texture
@@ -198,9 +198,10 @@ namespace
             {
                 for (size_t x = 0; x < props.m_tile_count_x; ++x)
                 {
-                    const Tile* tile = texture.load_tile(x, y);
-                    const bool has_transparency = has_transparent_pixels(*tile);
-                    texture.unload_tile(x, y, tile);
+                    const TilePtr tile_ptr = texture.load_tile(x, y);
+                    const bool has_transparency = has_transparent_pixels(*tile_ptr.get_tile());
+                    if (tile_ptr.has_ownership())
+                        delete tile_ptr.get_tile();
 
                     if (has_transparency)
                         return TextureAlphaModeAlphaChannel;

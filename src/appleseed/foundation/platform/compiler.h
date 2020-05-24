@@ -32,14 +32,22 @@
 //
 // Quick reminder about Visual Studio versions:
 //
-//   Visual Studio 2017   MSVC++ 14.1   _MSC_VER == 1910
-//   Visual Studio 2015   MSVC++ 14.0   _MSC_VER == 1900
-//   Visual Studio 2013   MSVC++ 12.0   _MSC_VER == 1800
-//   Visual Studio 2012   MSVC++ 11.0   _MSC_VER == 1700 (oldest supported version)
-//   Visual Studio 2010   MSVC++ 10.0   _MSC_VER == 1600 (unsupported)
-//   Visual Studio 2008   MSVC++ 9.0    _MSC_VER == 1500 (unsupported)
-//   Visual Studio 2005   MSVC++ 8.0    _MSC_VER == 1400 (unsupported)
-//   Visual Studio 2003   MSVC++ 7.1    _MSC_VER == 1310 (unsupported)
+//   Visual Studio 2019 Version 16.4    MSVC++ 14.24   _MSC_VER == 1924
+//   Visual Studio 2019 Version 16.3    MSVC++ 14.23   _MSC_VER == 1923
+//   Visual Studio 2019 Version 16.2    MSVC++ 14.22   _MSC_VER == 1922
+//   Visual Studio 2019 Version 16.1    MSVC++ 14.21   _MSC_VER == 1921
+//   Visual Studio 2019 Version 16.0    MSVC++ 14.2    _MSC_VER == 1920
+//   Visual Studio 2017 version 15.9    MSVC++ 14.16   _MSC_VER == 1916
+//   Visual Studio 2017 version 15.8    MSVC++ 14.15   _MSC_VER == 1915
+//   Visual Studio 2017 version 15.7    MSVC++ 14.14   _MSC_VER == 1914
+//   Visual Studio 2017 version 15.6    MSVC++ 14.13   _MSC_VER == 1913
+//   Visual Studio 2017 version 15.5    MSVC++ 14.12   _MSC_VER == 1912
+//   Visual Studio 2017 version 15.3    MSVC++ 14.11   _MSC_VER == 1911
+//   Visual Studio 2017 version 15.3    MSVC++ 14.11   _MSC_VER == 1911
+//   Visual Studio 2017 version 15.0    MSVC++ 14.1    _MSC_VER == 1910
+//   Visual Studio 2015 version 14.0    MSVC++ 14.0    _MSC_VER == 1900 (oldest supported version)
+//   Visual Studio 2013 version 12.0    MSVC++ 12.0    _MSC_VER == 1800 (unsupported)
+//   Visual Studio 2012 version 11.0    MSVC++ 11.0    _MSC_VER == 1700 (unsupported)
 //
 
 // appleseed.foundation headers.
@@ -94,6 +102,10 @@ namespace foundation
 #elif defined __GNUC__
     #define APPLESEED_FORCE_INLINE inline __attribute__((always_inline))
 
+// CUDA.
+#elif defined __CUDACC__
+    #define APPLESEED_FORCE_INLINE __forceinline__
+
 // Other compilers: fall back to standard inlining.
 #else
     #define APPLESEED_FORCE_INLINE inline
@@ -111,6 +123,10 @@ namespace foundation
 // gcc.
 #elif defined __GNUC__
     #define APPLESEED_NO_INLINE __attribute__((noinline))
+
+// CUDA.
+#elif defined __CUDACC__
+    #define APPLESEED_NO_INLINE __noinline__
 
 // Other compilers: ignore the qualifier.
 #else
@@ -168,7 +184,18 @@ namespace foundation
 // A qualifier similar to the 'restrict' keyword in C99.
 //
 
-#define APPLESEED_RESTRICT __restrict
+// Visual C++.
+#if defined _MSC_VER
+    #define APPLESEED_RESTRICT __restrict
+
+// gcc, clang or CUDA.
+#elif defined __GNUC__ || defined __clang__ || defined __CUDACC__
+    #define APPLESEED_RESTRICT __restrict__
+
+// Other compilers: ignore the qualifier.
+#else
+    #define APPLESEED_RESTRICT
+#endif
 
 
 //
@@ -290,6 +317,29 @@ namespace foundation
 #else
     #define APPLESEED_PRINTF_FMT
     #define APPLESEED_PRINTF_FMT_ATTR(string_index, first_to_check)
+#endif
+
+
+//
+// CUDA specific defines.
+//
+
+#ifdef __CUDACC__
+    #define APPLESEED_HOST                  __host__
+    #define APPLESEED_DEVICE                __device__
+    #define APPLESEED_HOST_DEVICE           __host__ __device__
+    #define APPLESEED_DEVICE_INLINE         __forceinline__ __device__
+    #define APPLESEED_HOST_DEVICE_INLINE    __forceinline__ __host__ __device__
+    #define APPLESEED_DEVICE_ALIGN(n)       __align__(n)
+#else
+    #define APPLESEED_HOST
+    #define APPLESEED_HOST_DEVICE
+    #define APPLESEED_HOST_DEVICE_INLINE    inline
+    #define APPLESEED_DEVICE_ALIGN(n)
+#endif
+
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ > 0
+    #define APPLESEED_DEVICE_COMPILATION    // defined when compiling CUDA device code
 #endif
 
 

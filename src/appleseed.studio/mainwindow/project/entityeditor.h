@@ -34,8 +34,8 @@
 #include "utility/inputwidgetproxies.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/core/concepts/noncopyable.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Qt headers.
 #include <QObject>
@@ -52,7 +52,6 @@ namespace renderer { class Project; }
 class QColor;
 class QVBoxLayout;
 class QFormLayout;
-class QSignalMapper;
 class QString;
 
 namespace appleseed {
@@ -82,8 +81,8 @@ class EntityEditor
             const std::string&              name,
             const std::string&              default_value)
         {
-            return values.strings().exist(name)
-                ? values.strings().get<std::string>(name)
+            return values.strings().exist(name.c_str())
+                ? values.strings().get<std::string>(name.c_str())
                 : default_value;
         }
     };
@@ -126,10 +125,6 @@ class EntityEditor
     QFormLayout*                            m_form_layout;
     InputMetadataCollection                 m_input_metadata;
     InputWidgetProxyCollection              m_widget_proxies;
-
-    QSignalMapper*                          m_entity_picker_bind_signal_mapper;
-    QSignalMapper*                          m_color_picker_signal_mapper;
-    QSignalMapper*                          m_file_picker_signal_mapper;
 
     void create_form_layout();
     void create_connections();

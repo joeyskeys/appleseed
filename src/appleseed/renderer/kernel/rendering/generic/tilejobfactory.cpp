@@ -43,7 +43,6 @@
 #include <cassert>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -57,7 +56,8 @@ void TileJobFactory::create(
     const TileOrdering                  tile_ordering,
     const TileJob::TileRendererVector&  tile_renderers,
     const TileJob::TileCallbackVector&  tile_callbacks,
-    const uint32                        pass_hash,
+    const size_t                        thread_count,
+    const std::uint32_t                 pass_hash,
     const Spectrum::Mode                spectrum_mode,
     TileJobVector&                      tile_jobs,
     IAbortSwitch&                       abort_switch)
@@ -66,7 +66,7 @@ void TileJobFactory::create(
     const CanvasProperties& props = frame.image().properties();
 
     // Generate tiles ordering.
-    vector<size_t> tiles;
+    std::vector<size_t> tiles;
     generate_tile_ordering(props, tile_ordering, tiles);
 
     // Make sure the right number of tiles was created.
@@ -90,6 +90,7 @@ void TileJobFactory::create(
                 frame,
                 tile_x,
                 tile_y,
+                thread_count,
                 pass_hash,
                 spectrum_mode,
                 abort_switch));
@@ -99,7 +100,7 @@ void TileJobFactory::create(
 void TileJobFactory::generate_tile_ordering(
     const CanvasProperties&             frame_properties,
     const TileOrdering                  tile_ordering,
-    vector<size_t>&                     tiles)
+    std::vector<size_t>&                tiles)
 {
     switch (tile_ordering)
     {

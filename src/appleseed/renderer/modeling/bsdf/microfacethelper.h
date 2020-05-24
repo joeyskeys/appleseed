@@ -39,7 +39,7 @@
 
 // appleseed.foundation headers.
 #include "foundation/math/basis.h"
-#include "foundation/math/microfacet.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 
@@ -57,7 +57,7 @@ namespace renderer
 
 inline float microfacet_alpha_from_roughness(const float roughness)
 {
-    return std::max(0.001f, foundation::square(roughness));
+    return std::max(0.001f, roughness * roughness);
 }
 
 inline void microfacet_alpha_from_roughness(
@@ -66,31 +66,19 @@ inline void microfacet_alpha_from_roughness(
     float&          alpha_x,
     float&          alpha_y)
 {
+    const float square_roughness = roughness * roughness;
     if (anisotropy >= 0.0f)
     {
         const float aspect = std::sqrt(1.0f - anisotropy * 0.9f);
-        alpha_x = std::max(0.001f, foundation::square(roughness) / aspect);
-        alpha_y = std::max(0.001f, foundation::square(roughness) * aspect);
+        alpha_x = std::max(0.001f, square_roughness / aspect);
+        alpha_y = std::max(0.001f, square_roughness * aspect);
     }
     else
     {
         const float aspect = std::sqrt(1.0f + anisotropy * 0.9f);
-        alpha_x = std::max(0.001f, foundation::square(roughness) * aspect);
-        alpha_y = std::max(0.001f, foundation::square(roughness) / aspect);
+        alpha_x = std::max(0.001f, square_roughness * aspect);
+        alpha_y = std::max(0.001f, square_roughness / aspect);
     }
-}
-
-
-//
-// Map highlight falloff to STD microfacet distribution function's gamma parameter
-// in a perceptually linear fashion.
-//
-
-inline float highlight_falloff_to_gama(const float highlight_falloff)
-{
-    const float t = highlight_falloff;
-    const float t2 = t * t;
-    return foundation::mix(1.51f, 40.0f, t2 * t2 * t);
 }
 
 
@@ -98,39 +86,35 @@ inline float highlight_falloff_to_gama(const float highlight_falloff)
 // Helper class to sample and evaluate microfacet BRDFs.
 //
 
-template <bool Flip>
+template <typename MDF>
 class MicrofacetBRDFHelper
 {
   public:
-    template <typename MDF, typename FresnelFun>
+    template <typename FresnelFun>
     static void sample(
         SamplingContext&                sampling_context,
-        const MDF&                      mdf,
+        const float                     roughness,
         const float                     alpha_x,
         const float                     alpha_y,
-        const float                     gamma,
         FresnelFun                      f,
+        const BSDF::LocalGeometry&      local_geometry,
+        const foundation::Dual3f&       outgoing,
         BSDFSample&                     sample)
     {
-        const foundation::Vector3f& outgoing = sample.m_outgoing.get_value();
-        foundation::Vector3f wo = sample.m_shading_basis.transform_to_local(outgoing);
+        foundation::Vector3f wo = local_geometry.m_shading_basis.transform_to_local(outgoing.get_value());
 
         if (wo.y == 0.0f)
             return;
 
-        // Flip the outgoing vector to be in the same hemisphere as the shading normal if needed.
-        if (Flip)
-            wo.y = std::abs(wo.y);
-
         // Compute the incoming direction by sampling the MDF.
         sampling_context.split_in_place(2, 1);
         const foundation::Vector2f s = sampling_context.next2<foundation::Vector2f>();
-        foundation::Vector3f m = mdf.sample(wo, s, alpha_x, alpha_y, gamma);
+        foundation::Vector3f m = MDF::sample(wo, s, alpha_x, alpha_y);
         foundation::Vector3f wi = foundation::reflect(wo, m);
 
         // Force the outgoing direction to lie above the geometric surface.
         const foundation::Vector3f ng =
-            sample.m_shading_basis.transform_to_local(sample.m_geometric_normal);
+            local_geometry.m_shading_basis.transform_to_local(local_geometry.m_geometric_normal);
         if (BSDF::force_above_surface(wi, ng))
             m = foundation::normalize(wo + wi);
 
@@ -140,7 +124,7 @@ class MicrofacetBRDFHelper
         const float cos_oh = foundation::dot(wo, m);
 
         const float probability =
-            mdf.pdf(wo, m, alpha_x, alpha_y, gamma) / std::abs(4.0f * cos_oh);
+            MDF::pdf(wo, m, alpha_x, alpha_y) / std::abs(4.0f * cos_oh);
         assert(probability >= 0.0f);
 
         // Disabled until BSDF are evaluated in local space, because the numerous
@@ -149,14 +133,12 @@ class MicrofacetBRDFHelper
         // #ifndef NDEBUG
         //         const float ref_probability =
         //             pdf(
-        //                 mdf,
         //                 alpha_x,
         //                 alpha_y,
-        //                 gamma,
-        //                 sample.m_shading_basis,
+        //                 local_geometry.m_shading_basis,
         //                 outgoing,
         //                 incoming);
-        // 
+        //
         //         assert(feq(probability, ref_probability, 1.0e-2f));
         // #endif
 
@@ -165,15 +147,14 @@ class MicrofacetBRDFHelper
         {
             sample.set_to_scattering(ScatteringMode::Glossy, probability);
 
-            const float D = mdf.D(m, alpha_x, alpha_y, gamma);
+            const float D = MDF::D(m, alpha_x, alpha_y);
             const float G =
-                mdf.G(
+                MDF::G(
                     wi,
                     wo,
                     m,
                     alpha_x,
-                    alpha_y,
-                    gamma);
+                    alpha_y);
 
             const foundation::Vector3f n(0.0f, 1.0f, 0.0f);
             const float cos_on = wo.y;
@@ -183,38 +164,28 @@ class MicrofacetBRDFHelper
             sample.m_value.m_glossy *= D * G / std::abs(4.0f * cos_on * cos_in);
 
             const foundation::Vector3f incoming =
-                sample.m_shading_basis.transform_to_parent(wi);
+                local_geometry.m_shading_basis.transform_to_parent(wi);
             sample.m_incoming = foundation::Dual<foundation::Vector3f>(incoming);
 
-            sample.compute_reflected_differentials();
+            sample.compute_glossy_reflected_differentials(local_geometry, roughness, outgoing);
         }
     }
 
-    template <typename MDF, typename FresnelFun>
+    template <typename FresnelFun>
     static float evaluate(
-        const MDF&                      mdf,
         const float                     alpha_x,
         const float                     alpha_y,
-        const float                     gamma,
-        const foundation::Basis3f&      shading_basis,
+        FresnelFun                      f,
+        const BSDF::LocalGeometry&      local_geometry,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming,
-        FresnelFun                      f,
         Spectrum&                       value)
     {
-        foundation::Vector3f wo = shading_basis.transform_to_local(outgoing);
-        foundation::Vector3f wi = shading_basis.transform_to_local(incoming);
+        foundation::Vector3f wo = local_geometry.m_shading_basis.transform_to_local(outgoing);
+        foundation::Vector3f wi = local_geometry.m_shading_basis.transform_to_local(incoming);
 
         if (wo.y == 0.0f || wi.y == 0.0f)
             return 0.0f;
-
-        // Flip the incoming and outgoing vectors to be in the same
-        // hemisphere as the shading normal if needed.
-        if (Flip)
-        {
-            wo.y = std::abs(wo.y);
-            wi.y = std::abs(wi.y);
-        }
 
         const foundation::Vector3f m = foundation::normalize(wi + wo);
 
@@ -223,15 +194,14 @@ class MicrofacetBRDFHelper
         if (cos_oh == 0.0f)
             return 0.0f;
 
-        const float D = mdf.D(m, alpha_x, alpha_y, gamma);
+        const float D = MDF::D(m, alpha_x, alpha_y);
         const float G =
-            mdf.G(
+            MDF::G(
                 wi,
                 wo,
                 m,
                 alpha_x,
-                alpha_y,
-                gamma);
+                alpha_y);
 
         const foundation::Vector3f n(0.0f, 1.0f, 0.0f);
         f(wo, m, n, value);
@@ -241,29 +211,18 @@ class MicrofacetBRDFHelper
 
         value *= D * G / std::abs(4.0f * cos_on * cos_in);
 
-        return mdf.pdf(wo, m, alpha_x, alpha_y, gamma) / std::abs(4.0f * cos_oh);
+        return MDF::pdf(wo, m, alpha_x, alpha_y) / std::abs(4.0f * cos_oh);
     }
 
-    template <typename MDF>
     static float pdf(
-        const MDF&                      mdf,
         const float                     alpha_x,
         const float                     alpha_y,
-        const float                     gamma,
-        const foundation::Basis3f&      shading_basis,
+        const BSDF::LocalGeometry&      local_geometry,
         const foundation::Vector3f&     outgoing,
         const foundation::Vector3f&     incoming)
     {
-        foundation::Vector3f wo = shading_basis.transform_to_local(outgoing);
-        foundation::Vector3f wi = shading_basis.transform_to_local(incoming);
-
-        // Flip the incoming and outgoing vectors to be in the same
-        // hemisphere as the shading normal if needed.
-        if (Flip)
-        {
-            wo.y = std::abs(wo.y);
-            wi.y = std::abs(wi.y);
-        }
+        foundation::Vector3f wo = local_geometry.m_shading_basis.transform_to_local(outgoing);
+        foundation::Vector3f wi = local_geometry.m_shading_basis.transform_to_local(incoming);
 
         const foundation::Vector3f m = foundation::normalize(wi + wo);
         const float cos_oh = foundation::dot(wo, m);
@@ -272,95 +231,19 @@ class MicrofacetBRDFHelper
             return 0.0f;
 
         return
-            mdf.pdf(
+            MDF::pdf(
                 wo,
                 m,
                 alpha_x,
-                alpha_y,
-                gamma) / std::abs(4.0f * cos_oh);
-    }
-
-    // Simplified version of sample used when computing albedo tables.
-    template <typename MDF>
-    static float sample(
-        const MDF&                      mdf,
-        const foundation::Vector2f&     s,
-        const float                     alpha,
-        const foundation::Vector3f&     wo,
-        foundation::Vector3f&           wi,
-        float&                          probability)
-    {
-        foundation::Vector3f m = mdf.sample(wo, s, alpha, alpha, 0.0f);
-
-        const float cos_oh = std::abs(foundation::dot(wo, m));
-        const float cos_on = std::abs(wo.y);
-
-        if (cos_on == 0.0f || cos_oh == 0.0f)
-        {
-            probability = 0.0f;
-            return 0.0f;
-        }
-
-        const foundation::Vector3f n(0.0f, 1.0f, 0.0f);
-
-        wi = foundation::reflect(wo, m);
-
-        if (BSDF::force_above_surface(wi, n))
-            m = foundation::normalize(wo + wi);
-
-        const float cos_in = std::abs(wi.y);
-
-        if (cos_in == 0.0f)
-        {
-            probability = 0.0f;
-            return 0.0f;
-        }
-
-        const float gamma = 1.0f;
-        const float D = mdf.D(m, alpha, alpha, gamma);
-        const float G =
-            mdf.G(
-                wi,
-                wo,
-                m,
-                alpha,
-                alpha,
-                gamma);
-
-        probability = mdf.pdf(wo, m, alpha, alpha, gamma) / std::abs(4.0f * cos_oh);
-        assert(probability >= 0.0f);
-
-        return D * G / (4.0f * cos_on * cos_in);
+                alpha_y) / std::abs(4.0f * cos_oh);
     }
 };
 
-float get_average_albedo(
-    const foundation::GGXMDF&       mdf,
-    const float                     roughness);
-
-float get_average_albedo(
-    const foundation::BeckmannMDF&  mdf,
-    const float                     roughness);
-
-void microfacet_energy_compensation_term(
-    const foundation::GGXMDF&       mdf,
-    const float                     roughness,
-    const float                     cos_in,
-    const float                     cos_on,
-    float&                          fms,
-    float&                          eavg);
-
-void microfacet_energy_compensation_term(
-    const foundation::BeckmannMDF&  mdf,
-    const float                     roughness,
-    const float                     cos_in,
-    const float                     cos_on,
-    float&                          fms,
-    float&                          eavg);
-
+float get_directional_albedo(const float cos_theta, const float roughness);
+float get_average_albedo(const float roughness);
 
 // Write the computed tables to OpenEXR images and C++ arrays.
-// Used in Renderer_Modeling_BSDF_EnergyCompensation unit test.
+// Used in Renderer_Modeling_BSDF_EnergyCompensation unit tests.
 void write_microfacet_directional_albedo_tables(const char* directory);
 
 }   // namespace renderer

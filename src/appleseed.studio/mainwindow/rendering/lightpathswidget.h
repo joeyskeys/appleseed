@@ -28,31 +28,37 @@
 
 #pragma once
 
-// appleseed.studio headers.
-#include "mainwindow/rendering/renderclipboardhandler.h"
+// appleseed.qtcommon headers.
+#include "widgets/icapturablewidget.h"
 
 // appleseed.renderer headers.
 #include "renderer/api/lighting.h"
 
-// On Windows, <QGLWidget> requires that <windows.h> is included first.
+// appleseed.foundation headers.
 #include "foundation/math/matrix.h"
 #include "foundation/math/transform.h"
-#ifdef _WIN32
-#include "foundation/platform/windows.h"
-#endif
+#include "foundation/math/vector.h"
 
 // Qt headers.
-#include <QGLWidget>
 #include <QObject>
+#include <QOpenGLWidget>
 
 // Standard headers.
 #include <cstddef>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 // Forward declarations.
+namespace renderer  { class Assembly; }
+namespace renderer  { class AssemblyInstance; }
 namespace renderer  { class Camera; }
+namespace renderer  { class Object; }
+namespace renderer  { class ObjectInstance; }
 namespace renderer  { class Project; }
 class QKeyEvent;
 class QImage;
+class QOpenGLFunctions_3_3_Core;
 
 namespace appleseed {
 namespace studio {
@@ -62,8 +68,8 @@ namespace studio {
 //
 
 class LightPathsWidget
-  : public QGLWidget
-  , public ICapturableWidget
+  : public QOpenGLWidget
+  , public qtcommon::ICapturableWidget
 {
     Q_OBJECT
 
@@ -106,14 +112,53 @@ class LightPathsWidget
     renderer::LightPathArray                m_light_paths;
     int                                     m_selected_light_path_index;    // -1 == display all paths
 
+    QOpenGLFunctions_3_3_Core*              m_gl;
+
+    std::vector<GLuint>                     m_scene_object_data_vbos;
+    std::vector<GLsizei>                    m_scene_object_data_index_counts;
+    std::vector<GLuint>                     m_scene_object_instance_vbos;
+    std::vector<GLsizei>                    m_scene_object_instance_counts;
+    std::vector<GLsizei>                    m_scene_object_current_instances;
+    std::vector<GLuint>                     m_scene_object_vaos;
+    std::unordered_map<std::string, size_t> m_scene_object_index_map;
+    GLuint                                  m_scene_shader_program;
+    GLint                                   m_scene_view_mat_location;
+    GLint                                   m_scene_proj_mat_location;
+    GLuint                                  m_light_paths_vbo;
+    std::vector<GLsizei>                    m_light_paths_index_offsets;
+    GLuint                                  m_light_paths_vao;
+    GLuint                                  m_light_paths_shader_program;
+    GLint                                   m_light_paths_view_mat_location;
+    GLint                                   m_light_paths_proj_mat_location;
+    foundation::Matrix4f                    m_gl_view_matrix;
+    foundation::Matrix4f                    m_gl_proj_matrix;
+    bool                                    m_gl_initialized;
+
     void initializeGL() override;
     void resizeGL(int w, int h) override;
     void paintGL() override;
     void keyPressEvent(QKeyEvent* event) override;
 
-    void render_geometry() const;
-    void render_light_paths() const;
-    void render_light_path(const size_t light_path_index) const;
+    void cleanup_gl_data();
+    void load_scene_data();
+    void load_light_paths_data();
+
+    void load_assembly_data(
+        const renderer::Assembly&           object);
+
+    void load_assembly_instance(
+        const renderer::AssemblyInstance&   assembly_instance,
+        const float                         time);
+
+    void load_object_data(
+        const renderer::Object&             object);
+
+    void load_object_instance(
+        const renderer::ObjectInstance&     object_instance,
+        const foundation::Matrix4f&         assembly_transform_matrix);
+
+    void render_geometry();
+    void render_light_paths();
 
     void dump_selected_light_path() const;
 };

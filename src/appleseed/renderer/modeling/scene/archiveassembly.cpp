@@ -39,9 +39,9 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/job/abortswitch.h"
 #include "foundation/utility/searchpaths.h"
@@ -50,7 +50,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -103,12 +102,11 @@ bool ArchiveAssembly::do_expand_contents(
     {
         // Establish and store the qualified path to the archive project.
         const SearchPaths& search_paths = project.search_paths();
-        const string filepath =
-            to_string(search_paths.qualify(m_params.get_required<string>("filename", "")));
+        const std::string filepath =
+            to_string(search_paths.qualify(m_params.get_required<std::string>("filename", "")));
 
-        ProjectFileReader reader;
         auto_release_ptr<Assembly> assembly =
-            reader.read_archive(
+            ProjectFileReader::read_archive(
                 filepath.c_str(),
                 nullptr,  // for now, we don't validate archives
                 search_paths,

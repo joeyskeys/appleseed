@@ -34,16 +34,14 @@
 #include "foundation/image/image.h"
 #include "foundation/image/text/stb_truetype.h"
 #include "foundation/math/scalar.h"
-#include "foundation/platform/types.h"
 #include "foundation/resources/fonts/Ubuntu-L.ttf.h"
 #include "foundation/resources/fonts/Ubuntu-M.ttf.h"
 
 // Standard headers.
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
-
-using namespace std;
 
 namespace foundation
 {
@@ -124,7 +122,7 @@ float TextRenderer::compute_string_width(
         }
     }
 
-    return max(width, max_width);
+    return std::max(width, max_width);
 }
     
 float TextRenderer::compute_string_height(
@@ -247,7 +245,7 @@ void TextRenderer::draw_string(
     const float baseline = ascent * scale;
 
     // Bitmap inside which glyphs will be rendered.
-    vector<uint8> glyph_bitmap(32 * 32, 0);
+    std::vector<std::uint8_t> glyph_bitmap(32 * 32, 0);
 
     float x = origin_x;
     float y = origin_y;
@@ -266,8 +264,8 @@ void TextRenderer::draw_string(
         }
 
         // Compute subpixel shifts.
-        const float shift_x = x - floor(x);
-        const float shift_y = y - floor(y);
+        const float shift_x = x - std::floor(x);
+        const float shift_y = y - std::floor(y);
 
         // Compute glyph box.
         int glyph_x0, glyph_y0, glyph_x1, glyph_y1;
@@ -314,7 +312,7 @@ void TextRenderer::draw_string(
                     continue;
 
                 // Compute text opacity.
-                const uint8 alpha_uint8 = glyph_bitmap[j * glyph_w + i];
+                const std::uint8_t alpha_uint8 = glyph_bitmap[j * glyph_w + i];
                 if (alpha_uint8 == 0)
                     continue;
                 const float alpha = alpha_uint8 * (1.0f / 255.0f);

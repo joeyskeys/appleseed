@@ -46,7 +46,6 @@
 #include "boost/chrono/duration.hpp"
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -91,8 +90,7 @@ void GlobalSampleAccumulationBuffer::store_samples(
         if ((counter++ & 4096) == 0 && abort_switch.is_aborted())
             return;
 
-        Color3f value(s->m_color.rgb());
-        m_fb.atomic_add(Vector2u(s->m_pixel_coords), &value[0]);
+        m_fb.atomic_add(Vector2u(s->m_pixel_coords), &s->m_color[0]);
     }
 }
 
@@ -136,7 +134,7 @@ void GlobalSampleAccumulationBuffer::develop_to_frame(
     }
 }
 
-void GlobalSampleAccumulationBuffer::increment_sample_count(const uint64 delta_sample_count)
+void GlobalSampleAccumulationBuffer::increment_sample_count(const std::uint64_t delta_sample_count)
 {
     m_sample_count += delta_sample_count;
 }

@@ -42,10 +42,10 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/image/color.h"
 #include "foundation/image/colorspace.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Forward declarations.
 namespace renderer  { class AOVComponents; }
@@ -53,7 +53,6 @@ namespace renderer  { class PixelContext; }
 namespace renderer  { class ShadingComponents; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -79,7 +78,7 @@ namespace
             m_inputs.declare("color_multiplier", InputFormatFloat, "1.0");
             m_inputs.declare("alpha_multiplier", InputFormatFloat, "1.0");
 
-            const string alpha_source = m_params.get_optional<string>("alpha_source", "color");
+            const std::string alpha_source = m_params.get_optional<std::string>("alpha_source", "color");
             if (alpha_source == "color")
                 m_alpha_source = AlphaSourceColor;
             else if (alpha_source == "material")

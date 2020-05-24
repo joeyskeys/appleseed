@@ -32,10 +32,8 @@
 // appleseed.foundation headers.
 #include "foundation/utility/otherwise.h"
 
-// Stamdard headers.
-#include <algorithm>
-
-using namespace std;
+// Standard headers.
+#include <cstdint>
 
 namespace foundation
 {
@@ -44,7 +42,109 @@ namespace foundation
 // Array class implementation.
 //
 
-Array::Concept::~Concept()
+template <typename T>
+Array::Concept* Array::Model<T>::copy() const
+{
+    return new Array::Model<T>(*this);
+}
+
+template <typename T>
+ArrayType Array::Model<T>::type() const
+{
+    return ArrayTraits<T>::array_type();
+}
+
+template <typename T>
+size_t Array::Model<T>::item_size() const
+{
+    return sizeof(T);
+}
+
+template <typename T>
+bool Array::Model<T>::empty() const
+{
+    return m_items.empty();
+}
+
+template <typename T>
+size_t Array::Model<T>::size() const
+{
+    return m_items.size();
+}
+
+template <typename T>
+size_t Array::Model<T>::capacity() const
+{
+    return m_items.capacity();
+}
+
+template <typename T>
+void Array::Model<T>::clear()
+{
+    m_items.clear();
+}
+
+template <typename T>
+void Array::Model<T>::reserve(const size_t n)
+{
+    m_items.reserve(n);
+}
+
+template <typename T>
+void Array::Model<T>::resize(const size_t n)
+{
+    m_items.resize(n);
+}
+
+template <typename T>
+void Array::Model<T>::shrink_to_fit()
+{
+    m_items.shrink_to_fit();
+}
+
+template <typename T>
+void Array::Model<T>::push_back(const void* p)
+{
+    m_items.push_back(*reinterpret_cast<const T*>(p));
+}
+
+template <typename T>
+const void* Array::Model<T>::begin() const
+{
+    return m_items.data();
+}
+
+template <typename T>
+const void* Array::Model<T>::end() const
+{
+    return
+          reinterpret_cast<const std::int8_t*>(m_items.data())
+        + sizeof(T) * m_items.size();
+}
+
+template <typename T>
+void* Array::Model<T>::begin()
+{
+    return m_items.data();
+}
+
+template <typename T>
+void* Array::Model<T>::end()
+{
+    return
+          reinterpret_cast<std::int8_t*>(m_items.data())
+        + sizeof(T) * m_items.size();
+}
+
+template <typename T>
+bool Array::Model<T>::equals(const Concept* rhs) const
+{
+    const Array::Model<T>* m = reinterpret_cast<const Array::Model<T>*>(rhs);
+    return m_items == m->m_items;
+}
+
+Array::Array()
+  : m_self(nullptr)
 {
 }
 
@@ -57,15 +157,14 @@ Array::Array(const ArrayType type, const size_t size)
 
     switch (type)
     {
-      ARRAY_INIT_CASE(UInt8Type, uint8)
-      ARRAY_INIT_CASE(UInt16Type, uint16)
-      ARRAY_INIT_CASE(UInt32Type, uint32)
+      ARRAY_INIT_CASE(UInt8Type, std::uint8_t)
+      ARRAY_INIT_CASE(UInt16Type, std::uint16_t)
+      ARRAY_INIT_CASE(UInt32Type, std::uint32_t)
       ARRAY_INIT_CASE(FloatType, float)
       ARRAY_INIT_CASE(Vector2fType, Vector2f)
       ARRAY_INIT_CASE(Vector3fType, Vector3f)
       ARRAY_INIT_CASE(CompressedUnitVectorType, CompressedUnitVector)
       ARRAY_INIT_CASE(Color3fType, Color3f)
-
       assert_otherwise;
     }
 
@@ -80,20 +179,20 @@ Array::~Array()
     delete m_self;
 }
 
-Array::Array(const Array& other)
+Array::Array(const Array& rhs)
 {
-    m_self = other.m_self->copy();
+    m_self = rhs.m_self->copy();
 }
 
-Array::Array(Array&& other) APPLESEED_NOEXCEPT
+Array::Array(Array&& rhs) APPLESEED_NOEXCEPT
 {
-    m_self = other.m_self;
-    other.m_self = nullptr;
+    m_self = rhs.m_self;
+    rhs.m_self = nullptr;
 }
 
-Array& Array::operator=(const Array& other)
+Array& Array::operator=(const Array& rhs)
 {
-    Concept* tmp(other.m_self->copy());
+    Concept* tmp(rhs.m_self->copy());
 
     delete m_self;
     m_self = tmp;
@@ -101,9 +200,11 @@ Array& Array::operator=(const Array& other)
     return *this;
 }
 
-Array& Array::operator=(Array&& other) APPLESEED_NOEXCEPT
+Array& Array::operator=(Array&& rhs) APPLESEED_NOEXCEPT
 {
-    swap(m_self, other.m_self);
+    delete m_self;
+    m_self = rhs.m_self;
+    rhs.m_self = nullptr;
     return *this;
 }
 
@@ -125,6 +226,12 @@ size_t Array::size() const
     return m_self->size();
 }
 
+size_t Array::item_size() const
+{
+    assert(!is_moved());
+    return m_self->item_size();
+}
+
 size_t Array::capacity() const
 {
     assert(!is_moved());
@@ -137,16 +244,28 @@ void Array::clear()
     m_self->clear();
 }
 
+void Array::reserve(const size_t n)
+{
+    assert(!is_moved());
+    m_self->reserve(n);
+}
+
 void Array::resize(const size_t n)
 {
     assert(!is_moved());
     m_self->resize(n);
 }
 
-void Array::reserve(const size_t n)
+const void* Array::data() const
 {
     assert(!is_moved());
-    m_self->reserve(n);
+    return begin();
+}
+
+void* Array::data()
+{
+    assert(!is_moved());
+    return begin();
 }
 
 void Array::shrink_to_fit()

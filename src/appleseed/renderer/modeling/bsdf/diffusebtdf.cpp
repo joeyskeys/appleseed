@@ -39,20 +39,19 @@
 #include "renderer/modeling/bsdf/bsdfwrapper.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/fresnel.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -108,6 +107,8 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
@@ -133,15 +134,17 @@ namespace
                 // Flip the incoming direction to the other side of the surface.
                 wi.y = -wi.y;
 
-                sample.m_incoming = Dual3f(sample.m_shading_basis.transform_to_parent(wi));
+                sample.m_incoming = Dual3f(local_geometry.m_shading_basis.transform_to_parent(wi));
 
                 // Compute the BRDF value.
                 sample.m_value.m_diffuse = values->m_transmittance;
-                sample.m_value.m_diffuse *= values->m_transmittance_multiplier * RcpPi<float>();
+                sample.m_value.m_diffuse *= values->m_transmittance_multiplier;
+                sample.m_aov_components.m_albedo = sample.m_value.m_diffuse;
+                sample.m_value.m_diffuse *= RcpPi<float>();
                 sample.m_value.m_beauty = sample.m_value.m_diffuse;
-                sample.m_aov_components.m_albedo = values->m_transmittance;
 
                 sample.m_min_roughness = 1.0f;
+                sample.compute_diffuse_differentials(outgoing);
             }
         }
 
@@ -149,8 +152,7 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -159,7 +161,7 @@ namespace
             if (!ScatteringMode::has_diffuse(modes))
                 return 0.0f;
 
-            const Vector3f& n = shading_basis.get_normal();
+            const Vector3f& n = local_geometry.m_shading_basis.get_normal();
             const float cos_in = dot(incoming, n);
             const float cos_on = dot(outgoing, n);
 
@@ -173,7 +175,7 @@ namespace
                 value.m_beauty = value.m_diffuse;
 
                 // Return the probability density of the sampled direction.
-                return abs(cos_in) * RcpPi<float>();
+                return std::abs(cos_in) * RcpPi<float>();
             }
             else
             {
@@ -185,8 +187,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override
@@ -194,12 +195,12 @@ namespace
             if (!ScatteringMode::has_diffuse(modes))
                 return 0.0f;
 
-            const Vector3f& n = shading_basis.get_normal();
+            const Vector3f& n = local_geometry.m_shading_basis.get_normal();
             const float cos_in = dot(incoming, n);
             const float cos_on = dot(outgoing, n);
 
             if (cos_in * cos_on < 0.0f)
-                return abs(cos_in) * RcpPi<float>();
+                return std::abs(cos_in) * RcpPi<float>();
             else
             {
                 // No transmission in the same hemisphere as outgoing.

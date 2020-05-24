@@ -32,8 +32,10 @@
 
 // appleseed.studio headers.
 #include "mainwindow/project/projectexplorer.h"
-#include "mainwindow/rendering/renderwidget.h"
+
+// appleseed.qtcommon headers.
 #include "utility/miscellaneous.h"
+#include "widgets/renderwidget.h"
 
 // appleseed.renderer headers.
 #include "renderer/api/frame.h"
@@ -61,9 +63,9 @@
 // Standard headers.
 #include <string>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 namespace OCIO = OCIO_NAMESPACE;
 
 namespace appleseed {
@@ -327,7 +329,7 @@ void RenderTab::create_toolbar()
     m_display_transform_combo->setObjectName("display_combo");
     {
         const char* display_name = m_ocio_config->getDefaultDisplay();
-        const string default_transform = m_ocio_config->getDefaultView(display_name);
+        const std::string default_transform = m_ocio_config->getDefaultView(display_name);
 
         int default_index = 0;
         for (int i = 0, e = m_ocio_config->getNumViews(display_name); i < e; ++i)
@@ -394,7 +396,7 @@ void RenderTab::create_scrollarea()
 
     // Wrap the render widget in a scroll area.
     m_scroll_area = new QScrollArea();
-    m_scroll_area->setObjectName(QString::fromUtf8("render_widget_scrollarea"));
+    m_scroll_area->setObjectName("render_widget_scrollarea");
     m_scroll_area->setAlignment(Qt::AlignCenter);
     m_scroll_area->setWidget(render_widget_wrapper);
 }
@@ -484,26 +486,19 @@ void RenderTab::recreate_handlers()
     // Clipboard handler.
     m_clipboard_handler.reset(new RenderClipboardHandler(m_render_widget, m_render_widget));
 
-    // Set initial state.
-    m_pixel_inspector_handler->set_enabled(false);
-    m_camera_controller->set_enabled(false);
-    m_scene_picking_handler->set_enabled(true);     // todo: should be true by default
-
     // Material drop handler.
     m_material_drop_handler.reset(
         new MaterialDropHandler(
             m_project,
             m_rendering_manager));
-
     connect(
-        m_render_widget,
-        SIGNAL(signal_material_dropped(
-            const foundation::Vector2d&,
-            const QString&)),
-        m_material_drop_handler.get(),
-        SLOT(slot_material_dropped(
-            const foundation::Vector2d&,
-            const QString&)));
+        m_render_widget, SIGNAL(signal_material_dropped(const foundation::Vector2d&, const QString&)),
+        m_material_drop_handler.get(), SLOT(slot_material_dropped(const foundation::Vector2d&, const QString&)));
+
+    // Set initial state.
+    m_pixel_inspector_handler->set_enabled(false);
+    m_camera_controller->set_enabled(false);
+    m_scene_picking_handler->set_enabled(true);
 }
 
 }   // namespace studio

@@ -30,8 +30,8 @@
 // Interface header.
 #include "renderregionhandler.h"
 
-// appleseed.studio headers.
-#include "utility/mousecoordinatestracker.h"
+// appleseed.qtcommon headers.
+#include "widgets/mousecoordinatestracker.h"
 
 // appleseed.foundation headers.
 #include "foundation/math/vector.h"
@@ -48,8 +48,8 @@
 // Standard headers.
 #include <algorithm>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -119,10 +119,10 @@ bool RenderRegionHandler::eventFilter(QObject* object, QEvent* event)
                     const Vector2i p0 = m_mouse_tracker.widget_to_pixel(m_origin);
                     const Vector2i p1 = m_mouse_tracker.widget_to_pixel(mouse_event->pos());
 
-                    const int x0 = max(min(p0.x, p1.x), 0);
-                    const int y0 = max(min(p0.y, p1.y), 0);
-                    const int x1 = max(p0.x, p1.x);
-                    const int y1 = max(p0.y, p1.y);
+                    const int x0 = std::max(std::min(p0.x, p1.x), 0);
+                    const int y0 = std::max(std::min(p0.y, p1.y), 0);
+                    const int x1 = std::max(p0.x, p1.x);
+                    const int y1 = std::max(p0.y, p1.y);
                     const int w = x1 - x0 + 1;
                     const int h = y1 - y0 + 1;
 

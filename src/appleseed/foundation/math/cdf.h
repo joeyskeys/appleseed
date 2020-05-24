@@ -29,9 +29,6 @@
 
 #pragma once
 
-// appleseed.foundation headers.
-#include "foundation/core/concepts/noncopyable.h"
-
 // Standard headers.
 #include <algorithm>
 #include <cassert>
@@ -53,13 +50,15 @@ namespace foundation
 
 template <typename Item, typename Weight>
 class CDF
-  : public NonCopyable
 {
   public:
     typedef std::pair<Item, Weight> ItemWeightPair;
 
     // Constructor.
     CDF();
+
+    // Return the number of items in the CDF.
+    size_t size() const;
 
     // Return true if the CDF is empty.
     bool empty() const;
@@ -112,7 +111,6 @@ size_t sample_pdf_linear_search(
 template <typename T>
 size_t sample_cdf_linear_search(
     const T*            cdf,
-    const size_t        size,
     const T             x);
 
 template <typename RandomAccessIter, typename Weight>
@@ -146,6 +144,12 @@ inline CDF<Item, Weight>::CDF()
 }
 
 template <typename Item, typename Weight>
+inline size_t CDF<Item, Weight>::size() const
+{
+    return m_items.size();
+}
+
+template <typename Item, typename Weight>
 inline bool CDF<Item, Weight>::empty() const
 {
     return m_items.empty();
@@ -168,6 +172,7 @@ inline void CDF<Item, Weight>::clear()
 {
     m_items.clear();
     m_weight_sum = Weight(0.0);
+    m_densities.clear();
 }
 
 template <typename Item, typename Weight>
@@ -185,7 +190,7 @@ inline void CDF<Item, Weight>::insert(const Item& item, const Weight weight)
 }
 
 template <typename Item, typename Weight>
-inline const std::pair<Item, Weight>& CDF<Item, Weight>::operator[](const size_t i) const
+inline const typename CDF<Item, Weight>::ItemWeightPair& CDF<Item, Weight>::operator[](const size_t i) const
 {
     assert(i < m_items.size());
     return m_items[i];
@@ -195,6 +200,7 @@ template <typename Item, typename Weight>
 void CDF<Item, Weight>::prepare()
 {
     assert(valid());
+    assert(m_densities.empty());
 
     const size_t item_count = m_items.size();
 
@@ -219,11 +225,16 @@ void CDF<Item, Weight>::prepare()
         if (m_items[i].second > Weight(0.0))
             break;
     }
+
+    assert(m_densities.size() == m_items.size());
 }
 
 template <typename Item, typename Weight>
 inline const std::pair<Item, Weight>& CDF<Item, Weight>::sample(const Weight x) const
 {
+    assert(valid());
+    assert(!m_densities.empty());
+
     const size_t i =
         sample_cdf(
             m_densities.begin(),
@@ -253,7 +264,9 @@ inline size_t sample_pdf_linear_search(
     for (size_t i = 0; i < size; ++i)
     {
         u += pdf[i];
-        if (x < u) return i;
+
+        if (x < u)
+            return i;
     }
 
     return size - 1;

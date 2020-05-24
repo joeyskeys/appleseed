@@ -31,17 +31,19 @@
 #include "commandlinehandler.h"
 #include "mainwindow/mainwindow.h"
 #include "python/pythoninterpreter.h"
+
+// appleseed.qtcommon headers.
 #include "utility/miscellaneous.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 #include "application/superlogger.h"
 
 // appleseed.foundation headers.
 #include "foundation/core/appleseed.h"
+#include "foundation/log/log.h"
 #include "foundation/platform/path.h"
 #include "foundation/platform/python.h"
-#include "foundation/utility/log.h"
 #include "foundation/utility/preprocessor.h"
 
 // appleseed.main headers.
@@ -49,16 +51,18 @@
 
 // Qt headers.
 #include <QApplication>
+#include <QImageReader>
 #include <QLocale>
 #include <QMessageBox>
 #include <QString>
-#include <QTextStream>
+#include <QSurfaceFormat>
 
 // Boost headers.
 #include "boost/filesystem/operations.hpp"
 #include "boost/filesystem/path.hpp"
 
 // Standard headers.
+#include <cassert>
 #include <clocale>
 #include <cstdio>
 #include <cstdlib>
@@ -67,13 +71,10 @@
 #include <sstream>
 #include <string>
 
-// Qt headers
-#include <QImageReader>
-
 using namespace appleseed::studio;
-using namespace appleseed::shared;
+using namespace appleseed::common;
+using namespace appleseed::qtcommon;
 using namespace foundation;
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace
@@ -145,12 +146,12 @@ namespace
 
             if (bf::is_directory(python_path))
             {
-                const string python_path_str = safe_canonical(python_path).string();
+                const std::string python_path_str = safe_weakly_canonical(python_path).string();
 
                 // The C string below must be declared static because Python just keeps a pointer to it.
                 static char python_home[FOUNDATION_MAX_PATH_LENGTH + 1];
                 assert(python_path_str.size() <= FOUNDATION_MAX_PATH_LENGTH);
-                strncpy(python_home, python_path_str.c_str(), sizeof(python_home) - 1);
+                std::strncpy(python_home, python_path_str.c_str(), sizeof(python_home) - 1);
 
                 LOG_INFO(
                     g_logger,
@@ -162,7 +163,7 @@ namespace
             }
             else
             {
-                const string python_path_str = python_path.make_preferred().string();
+                const std::string python_path_str = python_path.make_preferred().string();
 
                 QMessageBox msgbox;
                 msgbox.setWindowTitle("Python 2.7 Installation Not Found");
@@ -180,21 +181,21 @@ namespace
         }
     }
 
-    bool load_file(const string& filename, string& contents)
+    bool load_file(const std::string& filename, std::string& contents)
     {
-        ifstream file(filename.c_str());
+        std::ifstream file(filename.c_str());
 
         if (!file.is_open())
             return false;
 
-        stringstream sstr;
+        std::stringstream sstr;
         sstr << file.rdbuf();
         contents = sstr.str();
 
         return true;
     }
 
-    bool load_stylesheet(const string& stylesheet_path, string& stylesheet)
+    bool load_stylesheet(const std::string& stylesheet_path, std::string& stylesheet)
     {
         if (!load_file(stylesheet_path, stylesheet))
         {
@@ -205,7 +206,7 @@ namespace
                 QString(
                     "The stylesheet %1 could not be loaded.\n\n"
                     "The application will use the default style.")
-                    .arg(QString::fromStdString(stylesheet_path)));
+                    .arg(QString::fromStdString(safe_weakly_canonical(stylesheet_path).string())));
             msgbox.setStandardButtons(QMessageBox::Ok);
             msgbox.setDefaultButton(QMessageBox::Ok);
             msgbox.exec();
@@ -263,7 +264,7 @@ namespace
             / "default.qss";
 
         // Load and apply the stylesheet.
-        string stylesheet;
+        std::string stylesheet;
         if (load_stylesheet(stylesheet_path.string(), stylesheet))
         {
             application.setStyle("plastique");
@@ -328,6 +329,14 @@ int main(int argc, char* argv[])
     // Our message handler must be set before the construction of QApplication.
     g_previous_message_handler = qInstallMessageHandler(message_handler);
 
+    // Set default surface format before creating application instance. This is
+    // required on macOS in order to use an OpenGL Core profile context.
+    QSurfaceFormat default_format;
+    default_format.setVersion(3, 3);
+    default_format.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(default_format);
+
+    // Construct the Qt application.
     QApplication application(argc, argv);
     QApplication::setOrganizationName("appleseedhq");
     QApplication::setOrganizationDomain("appleseedhq.net");
@@ -339,18 +348,19 @@ int main(int argc, char* argv[])
     // The locale must be set after the construction of QApplication.
     QLocale::setDefault(QLocale::C);
 
-    // QApplication sets C locale to the user's locale, we need to fix this.
-    std::setlocale(LC_ALL, "C");
-
     // Qt changes the locale when loading images from disk for the very first time.
     // The problem was tracked for both `QImage` and `QPixmap`: in their `load()`
     // functions, both classes call `QImageReader::read()` which causes the locale
-    // to be changed to the system's one. The line that follows is a dirty fix
-    // that consists in loading an image (any image) at the very beginning and
-    // resetting the locale right after, thus preventing `QImageReader::read()`
-    // from changing it again (as it happens only on the very first `read()`).
-    // Issue reported and tracked on GitHub under reference #1435.
+    // to be changed to the system's one. The line that follows is a dirty fix that
+    // consists in loading an image (any image) at the very beginning and resetting
+    // the locale right after, thus preventing `QImageReader::read()` from changing
+    // it again (as it happens only on the very first `read()`). Issue reported and
+    // tracked on appleseed's GitHub under reference #1435.
     QImageReader(make_app_path("icons/icon.png")).read();   // any image
+
+    // Force linking of resources provided by appleseed.qtcommon into the final binary.
+    // See https://doc.qt.io/qt-5/resources.html#using-resources-in-a-library for details.
+    Q_INIT_RESOURCE(qtcommonresources);
 
     // Make sure this build can run on this host.
     check_compatibility();
@@ -369,7 +379,14 @@ int main(int argc, char* argv[])
     set_default_stylesheet(application);
 
     // Create the application's main window.
-    appleseed::studio::MainWindow window;
+    MainWindow window;
+
+    // QApplication and QMainWindow reset the C locale to the user's locale.
+    // Fix this by setting the C locale back to "C" which is the startup locale.
+    // Note that setting the C locale once at the start of the application is enough:
+    // all modules link dynamically against the C runtime library so they will all
+    // use this locale.
+    std::setlocale(LC_ALL, "C");
 
     // Initialize the python interpreter and load plugins.
     PythonInterpreter::instance().set_main_window(&window);
@@ -391,6 +408,7 @@ int main(int argc, char* argv[])
         }
     }
 
+    // Show the application's main window.
     window.show();
 
     return application.exec();

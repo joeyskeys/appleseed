@@ -53,7 +53,6 @@
 #include <iostream>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -211,7 +210,7 @@ AOVAccumulatorContainer::AOVAccumulatorContainer(const Frame& frame)
         }
         m_automata.compile();
 
-        m_accum_ptr = unique_ptr<OSL::Accumulator>(new OSL::Accumulator(&m_automata));
+        m_accum_ptr = std::unique_ptr<OSL::Accumulator>(new OSL::Accumulator(&m_automata));
         for (size_t i = 0, e = frame.lpe_aovs().size(); i < e; ++i)
         {
             const LPEAOV* aov = static_cast<LPEAOV*>(frame.lpe_aovs().get_by_index(i));

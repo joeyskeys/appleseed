@@ -30,13 +30,11 @@
 #include "energycompensation.h"
 
 // appleseed.foundation headers.
-#include "foundation/core/concepts/noncopyable.h"
 #include "foundation/image/color.h"
 #include "foundation/image/genericimagefilewriter.h"
 #include "foundation/image/image.h"
 #include "foundation/image/tile.h"
 #include "foundation/math/scalar.h"
-#include "foundation/math/vector.h"
 
 // Boost headers.
 #include "boost/filesystem/fstream.hpp"
@@ -46,9 +44,8 @@
 #include <iomanip>
 
 using namespace foundation;
-using namespace std;
 
-namespace bfs = boost::filesystem;
+namespace bf = boost::filesystem;
 
 namespace renderer
 {
@@ -56,7 +53,7 @@ namespace renderer
 namespace
 {
     void write_cpp_array(
-        const bfs::path& filename,
+        const bf::path&  filename,
         const char*      array_name,
         const size_t     dir_array_size,
         const size_t     avg_array_size,
@@ -67,12 +64,12 @@ namespace
         const size_t array_size = dir_array_size + avg_array_size;
         assert(array_size % num_columns == 0);
 
-        bfs::ofstream of(filename);
-        of << setprecision(6) << fixed;
+        bf::ofstream of(filename);
+        of << std::setprecision(6) << std::fixed;
 
-        of << "extern const float " << array_name << "[" << array_size << "] = " << endl;
-        of << "{" << endl;
-        of << "    // Directional albedo." << endl;
+        of << "extern const float " << array_name << "[" << array_size << "] = " << std::endl;
+        of << "{" << std::endl;
+        of << "    // Directional albedo." << std::endl;
 
         size_t i = 0;
         const float* p = dir_table;
@@ -87,10 +84,10 @@ namespace
                 ++i;
             }
 
-            of << endl;
+            of << std::endl;
         }
 
-        of << "    // Average albedo." << endl;
+        of << "    // Average albedo." << std::endl;
 
         i = 0;
         p = avg_table;
@@ -108,10 +105,10 @@ namespace
                 ++i;
             }
 
-            of << endl;
+            of << std::endl;
         }
 
-        of << "};" << endl;
+        of << "};" << std::endl;
     }
 }
 
@@ -163,8 +160,8 @@ float AlbedoTable2D::get_directional_albedo(const float cos_theta, const float r
     const float s = floor_frac(x, i);
     const float t = floor_frac(y, j);
 
-    const size_t i1 = min(i + 1, TableSize - 1);
-    const size_t j1 = min(j + 1, TableSize - 1);
+    const size_t i1 = std::min(i + 1, TableSize - 1);
+    const size_t j1 = std::min(j + 1, TableSize - 1);
 
     // Fetch the values.
     const float a = dir_table(i , j );
@@ -186,7 +183,7 @@ float AlbedoTable2D::get_average_albedo(const float roughness) const
 
     size_t i;
     const float t = floor_frac(x, i);
-    const size_t i1 = min(i + 1, TableSize - 1);
+    const size_t i1 = std::min(i + 1, TableSize - 1);
 
     // Fetch the values.
     const float a = avg_table(i );
@@ -211,7 +208,7 @@ float AlbedoTable2D::avg_table(const size_t x) const
     return m_avg_table[x];
 }
 
-void AlbedoTable2D::write_table_to_image(const bfs::path& filename) const
+void AlbedoTable2D::write_table_to_image(const bf::path& filename) const
 {
     Image image(TableSize, TableHeight, TableSize, TableHeight, 3, PixelFormatFloat);
 
@@ -241,7 +238,7 @@ void AlbedoTable2D::write_table_to_image(const bfs::path& filename) const
 }
 
 void AlbedoTable2D::write_table_to_cpp_array(
-    const bfs::path& filename,
+    const bf::path&  filename,
     const char*      array_name) const
 {
     write_cpp_array(
@@ -319,9 +316,9 @@ float AlbedoTable3D::get_directional_albedo(const float eta, const float roughne
     const float t = floor_frac(y, iy);
     const float u = floor_frac(z, iz);
 
-    const size_t ix1 = min(ix + 1, TableSize - 1);
-    const size_t iy1 = min(iy + 1, TableSize - 1);
-    const size_t iz1 = min(iz + 1, TableSize - 1);
+    const size_t ix1 = std::min(ix + 1, TableSize - 1);
+    const size_t iy1 = std::min(iy + 1, TableSize - 1);
+    const size_t iz1 = std::min(iz + 1, TableSize - 1);
 
     // Fetch the values.
     const float a = dir_table(ix , iy , iz);
@@ -355,8 +352,8 @@ float AlbedoTable3D::get_average_albedo(const float eta, const float roughness) 
     const float s = floor_frac(x, ix);
     const float t = floor_frac(y, iy);
 
-    const size_t ix1 = min(ix + 1, TableSize - 1);
-    const size_t iy1 = min(iy + 1, TableSize - 1);
+    const size_t ix1 = std::min(ix + 1, TableSize - 1);
+    const size_t iy1 = std::min(iy + 1, TableSize - 1);
 
     // Fetch the values.
     const float a = avg_table(ix , iy );
@@ -402,7 +399,7 @@ float& AlbedoTable3D::avg_table(const size_t x, const size_t y)
     return m_avg_table[(y * TableSize) + x];
 }
 
-void AlbedoTable3D::write_table_to_image(const bfs::path& filename) const
+void AlbedoTable3D::write_table_to_image(const bf::path& filename) const
 {
     Image image(
         TableSize * (TableSize + 1),
@@ -456,7 +453,7 @@ void AlbedoTable3D::write_table_to_image(const bfs::path& filename) const
 }
 
 void AlbedoTable3D::write_table_to_cpp_array(
-    const bfs::path& filename,
+    const bf::path&  filename,
     const char*      array_name) const
 {
     const size_t avg_table_size = TableSize * TableSize;
@@ -485,7 +482,7 @@ float average_albedo(
     }
 
     avg /= table_size;
-    return min(2.0f * avg, 1.0f);
+    return std::min(2.0f * avg, 1.0f);
 }
 
 }   // namespace renderer

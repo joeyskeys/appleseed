@@ -33,8 +33,9 @@
 #include "renderer/modeling/object/proceduralobject.h"
 
 // appleseed.foundation headers.
-#include "foundation/platform/types.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/math/ray.h"
+#include "foundation/math/vector.h"
+#include "foundation/memory/autoreleaseptr.h"
 
 // appleseed.main headers.
 #include "main/dllsymbol.h"
@@ -79,12 +80,24 @@ class APPLESEED_DLLSYMBOL DiskObject
     const char* get_material_slot(const size_t index) const override;
 
     double get_uncached_radius() const;
+    foundation::Vector3d get_uncached_center() const;
+
+    void get_axes(
+        foundation::Vector3d&       x,
+        foundation::Vector3d&       y,
+        foundation::Vector3d&       n) const;
 
     void intersect(
         const ShadingRay&           ray,
         IntersectionResult&         result) const override;
 
     bool intersect(const ShadingRay& ray) const override;
+
+    void refine_and_offset(
+        const foundation::Ray3d&    obj_inst_ray,
+        foundation::Vector3d&       obj_inst_front_point,
+        foundation::Vector3d&       obj_inst_back_point,
+        foundation::Vector3d&       obj_inst_geo_normal) const override;
 
   private:
     friend class DiskObjectFactory;
@@ -103,7 +116,7 @@ class APPLESEED_DLLSYMBOL DiskObject
 // Disk object factory.
 //
 
-class DiskObjectFactory
+class APPLESEED_DLLSYMBOL DiskObjectFactory
   : public IObjectFactory
 {
   public:

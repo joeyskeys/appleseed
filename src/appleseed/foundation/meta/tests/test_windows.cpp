@@ -36,21 +36,34 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Platform_Windows)
 {
-    TEST_CASE(GetWindowsLastErrorMessage_LastErrorCodeIsSuccess)
+    TEST_CASE(GetLastWindowsErrorMessage_LastErrorCodeIsSuccess_MessageIsNotEmpty)
     {
         SetLastError(ERROR_SUCCESS);
-        const string msg = get_windows_last_error_message();
+        const std::string msg = get_last_windows_error_message();
         EXPECT_FALSE(msg.empty());
     }
 
-    TEST_CASE(GetWindowsLastErrorMessage_LastErrorCodeIsFileNotFound)
+    TEST_CASE(GetLastWindowsErrorMessageWide_LastErrorCodeIsSuccess_MessageIsNotEmpty)
+    {
+        SetLastError(ERROR_SUCCESS);
+        const std::wstring msg = get_last_windows_error_message_wide();
+        EXPECT_FALSE(msg.empty());
+    }
+
+    TEST_CASE(GetLastWindowsErrorMessage_LastErrorCodeIsFileNotFound_MessageIsNotEmpty)
     {
         SetLastError(ERROR_FILE_NOT_FOUND);
-        const string msg = get_windows_last_error_message();
+        const std::string msg = get_last_windows_error_message();
+        EXPECT_FALSE(msg.empty());
+    }
+
+    TEST_CASE(GetLastWindowsErrorMessageWide_LastErrorCodeIsFileNotFound_MessageIsNotEmpty)
+    {
+        SetLastError(ERROR_FILE_NOT_FOUND);
+        const std::wstring msg = get_last_windows_error_message_wide();
         EXPECT_FALSE(msg.empty());
     }
 }

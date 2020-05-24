@@ -31,11 +31,16 @@
 #include "system.h"
 
 // appleseed.foundation headers.
+#ifdef APPLESEED_WITH_GPU
+#include "foundation/cuda/cudadevice.h"
+#include "foundation/cuda/exception.h"
+#endif
 #include "foundation/platform/arch.h"
 #include "foundation/platform/defaulttimers.h"
 #include "foundation/platform/thread.h"
-#include "foundation/utility/log.h"
-#include "foundation/utility/string.h"
+#include "foundation/platform/types.h"
+#include "foundation/log/log.h"
+#include "foundation/string/string.h"
 
 // Standard headers.
 #include <cstring>
@@ -95,7 +100,13 @@
 
 #endif
 
-using namespace std;
+#ifdef APPLESEED_WITH_GPU
+
+    #include <cuda.h>
+    #include <optix.h>
+
+#endif
+
 
 namespace foundation
 {
@@ -113,41 +124,35 @@ namespace
     //   cpuinfo[1] == EBX
     //   cpuinfo[2] == ECX
     //   cpuinfo[3] == EDX
-    void cpuid(uint32 cpuinfo[4], const uint32 index)
+    void cpuid(std::uint32_t cpuinfo[4], const std::uint32_t index)
     {
         __cpuidex(reinterpret_cast<int*>(cpuinfo), static_cast<int>(index), 0);
     }
 
-    uint64 xgetbv(const int32 index)
+    std::uint64_t xgetbv(const std::int32_t index)
     {
         return _xgetbv(index);
     }
 
-    // This code is based on a code snippet by Nick Strupat (http://stackoverflow.com/a/4049562).
-    bool get_cache_descriptor(const size_t level, CACHE_DESCRIPTOR& result)
+    // This code is loosely based on a code snippet by Nick Strupat (http://stackoverflow.com/a/4049562).
+    std::size_t get_cache_descriptor(const std::size_t level, CACHE_DESCRIPTOR& result)
     {
         assert(level >= 1 && level <= 3);
 
         DWORD buffer_size = 0;
-        BOOL success = GetLogicalProcessorInformation(0, &buffer_size);
-        if (success == TRUE || GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        const BOOL success = GetLogicalProcessorInformation(nullptr, &buffer_size);
+        if (success == TRUE || GetLastError() != ERROR_INSUFFICIENT_BUFFER)  // todo: success == TRUE?
             return false;
 
-        SYSTEM_LOGICAL_PROCESSOR_INFORMATION* buffer =
-            (SYSTEM_LOGICAL_PROCESSOR_INFORMATION*)malloc(buffer_size);
-        if (buffer == 0)
+        std::vector<std::uint8_t> buffer_vec(buffer_size);
+        auto buffer = reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION*>(buffer_vec.data());
+
+        if (GetLogicalProcessorInformation(buffer, &buffer_size) == FALSE)
             return false;
 
-        success = GetLogicalProcessorInformation(buffer, &buffer_size);
-        if (success == FALSE)
-        {
-            free(buffer);
-            return false;
-        }
+        std::size_t cache_count = 0;
 
-        bool found = false;
-
-        for (size_t i = 0; i < buffer_size / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); ++i)
+        for (std::size_t i = 0; i < buffer_size / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); ++i)
         {
             if (buffer[i].Relationship == RelationCache)
             {
@@ -155,56 +160,78 @@ namespace
 
                 if (cache.Level == level && (cache.Type == CacheData || cache.Type == CacheUnified))
                 {
-                    found = true;
-                    result = cache;
-                    break;
+                    if (cache_count == 0)
+                        result = cache;
+                    ++cache_count;
                 }
             }
         }
 
-        free(buffer);
-
-        return found;
+        return cache_count;
     }
 }
 
-size_t System::get_l1_data_cache_size()
+std::size_t System::get_l1_data_cache_count()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(1, cache) ? cache.Size : 0;
+    return get_cache_descriptor(1, cache);
 }
 
-size_t System::get_l1_data_cache_line_size()
+std::size_t System::get_l1_data_cache_size()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(1, cache) ? cache.LineSize : 0;
+    const std::size_t cache_count = get_cache_descriptor(1, cache);
+    return cache_count > 0 ? cache.Size : 0;
 }
 
-size_t System::get_l2_cache_size()
+std::size_t System::get_l1_data_cache_line_size()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(2, cache) ? cache.Size : 0;
+    const std::size_t cache_count = get_cache_descriptor(1, cache);
+    return cache_count > 0 ? cache.LineSize : 0;
 }
 
-size_t System::get_l2_cache_line_size()
+std::size_t System::get_l2_cache_count()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(2, cache) ? cache.LineSize : 0;
+    return get_cache_descriptor(2, cache);
 }
 
-size_t System::get_l3_cache_size()
+std::size_t System::get_l2_cache_size()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(3, cache) ? cache.Size : 0;
+    const std::size_t cache_count = get_cache_descriptor(2, cache);
+    return cache_count > 0 ? cache.Size : 0;
 }
 
-size_t System::get_l3_cache_line_size()
+std::size_t System::get_l2_cache_line_size()
 {
     CACHE_DESCRIPTOR cache;
-    return get_cache_descriptor(3, cache) ? cache.LineSize : 0;
+    const std::size_t cache_count = get_cache_descriptor(2, cache);
+    return cache_count > 0 ? cache.LineSize : 0;
 }
 
-uint64 System::get_total_physical_memory_size()
+std::size_t System::get_l3_cache_count()
+{
+    CACHE_DESCRIPTOR cache;
+    return get_cache_descriptor(3, cache);
+}
+
+std::size_t System::get_l3_cache_size()
+{
+    CACHE_DESCRIPTOR cache;
+    const std::size_t cache_count = get_cache_descriptor(3, cache);
+    return cache_count > 0 ? cache.Size : 0;
+}
+
+std::size_t System::get_l3_cache_line_size()
+{
+    CACHE_DESCRIPTOR cache;
+    const std::size_t cache_count = get_cache_descriptor(3, cache);
+    return cache_count > 0 ? cache.LineSize : 0;
+}
+
+std::uint64_t System::get_total_physical_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
@@ -212,10 +239,10 @@ uint64 System::get_total_physical_memory_size()
     mem_info.dwLength = sizeof(mem_info);
     GlobalMemoryStatusEx(&mem_info);
 
-    return static_cast<uint64>(mem_info.ullTotalPhys);
+    return static_cast<std::uint64_t>(mem_info.ullTotalPhys);
 }
 
-uint64 System::get_total_virtual_memory_size()
+std::uint64_t System::get_total_virtual_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
@@ -223,10 +250,10 @@ uint64 System::get_total_virtual_memory_size()
     mem_info.dwLength = sizeof(mem_info);
     GlobalMemoryStatusEx(&mem_info);
 
-    return static_cast<uint64>(mem_info.ullTotalPageFile);
+    return static_cast<std::uint64_t>(mem_info.ullTotalPageFile);
 }
 
-uint64 System::get_process_virtual_memory_size()
+std::uint64_t System::get_process_virtual_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
@@ -239,7 +266,7 @@ uint64 System::get_process_virtual_memory_size()
     return pmc.PrivateUsage;
 }
 
-uint64 System::get_peak_process_virtual_memory_size()
+std::uint64_t System::get_peak_process_virtual_memory_size()
 {
     PROCESS_MEMORY_COUNTERS_EX pmc;
     GetProcessMemoryInfo(
@@ -263,7 +290,7 @@ namespace
     //   cpuinfo[1] == EBX
     //   cpuinfo[2] == ECX
     //   cpuinfo[3] == EDX
-    void cpuid(uint32 cpuinfo[4], const uint32 index)
+    void cpuid(std::uint32_t cpuinfo[4], const std::uint32_t index)
     {
         __cpuid_count(
             index,
@@ -274,74 +301,92 @@ namespace
             cpuinfo[3]);
     }
 
-    uint64 xgetbv(const int32 index)
+    std::uint64_t xgetbv(const std::int32_t index)
     {
-        uint32 eax, edx;
+        std::uint32_t eax, edx;
         __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
-        return (static_cast<uint64>(edx) << 32) | eax;
+        return (static_cast<std::uint64_t>(edx) << 32) | eax;
     }
 
-    size_t get_system_value(const char* name)
+    std::size_t get_system_value(const char* name)
     {
-        size_t value = 0;
-        size_t value_size = sizeof(value);
+        std::size_t value = 0;
+        std::size_t value_size = sizeof(value);
         return sysctlbyname(name, &value, &value_size, 0, 0) == 0 ? value : 0;
     }
 }
 
-size_t System::get_l1_data_cache_size()
+std::size_t System::get_l1_data_cache_count()
+{
+    // todo
+    return 0;
+}
+
+std::size_t System::get_l1_data_cache_size()
 {
     return get_system_value("hw.l1dcachesize");
 }
 
-size_t System::get_l1_data_cache_line_size()
+std::size_t System::get_l1_data_cache_line_size()
 {
     return get_l1_data_cache_size() > 0 ? get_system_value("hw.cachelinesize") : 0;
 }
 
-size_t System::get_l2_cache_size()
+std::size_t System::get_l2_cache_count()
+{
+    // todo
+    return 0;
+}
+
+std::size_t System::get_l2_cache_size()
 {
     return get_system_value("hw.l2cachesize");
 }
 
-size_t System::get_l2_cache_line_size()
+std::size_t System::get_l2_cache_line_size()
 {
     return get_l2_cache_size() > 0 ? get_system_value("hw.cachelinesize") : 0;
 }
 
-size_t System::get_l3_cache_size()
+std::size_t System::get_l3_cache_count()
+{
+    // todo
+    return 0;
+}
+
+std::size_t System::get_l3_cache_size()
 {
     return get_system_value("hw.l3cachesize");
 }
 
-size_t System::get_l3_cache_line_size()
+std::size_t System::get_l3_cache_line_size()
 {
     return get_l3_cache_size() > 0 ? get_system_value("hw.cachelinesize") : 0;
 }
 
-uint64 System::get_total_physical_memory_size()
+std::uint64_t System::get_total_physical_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
     int name[2] = { CTL_HW, HW_MEMSIZE };
-    uint64 result;
-    size_t result_length = sizeof(uint64);
+    std::uint64_t result;
+    std::size_t result_length = sizeof(std::uint64_t);
     sysctl(name, 2, &result, &result_length, 0, 0);
 
-    return static_cast<uint64>(result);
+    return static_cast<std::uint64_t>(result);
 }
 
-uint64 System::get_total_virtual_memory_size()
+std::uint64_t System::get_total_virtual_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
     struct statfs stats;
     if (statfs("/", &stats) == 0)
-        return static_cast<uint64>(stats.f_bsize) * stats.f_bfree;
+        return static_cast<std::uint64_t>(stats.f_bsize) * stats.f_bfree;
     else return 0;
 }
 
-uint64 System::get_process_virtual_memory_size()
+std::uint64_t System::get_process_virtual_memory_size()
 {
     // Reference: http://nadeausoftware.com/articles/2012/07/c_c_tip_how_get_process_resident_set_size_physical_memory_use
 
@@ -370,7 +415,7 @@ uint64 System::get_process_virtual_memory_size()
     return info.virtual_size;
 }
 
-uint64 System::get_peak_process_virtual_memory_size()
+std::uint64_t System::get_peak_process_virtual_memory_size()
 {
     // todo: implement.
     return 0;
@@ -389,7 +434,7 @@ namespace
     //   cpuinfo[1] == EBX
     //   cpuinfo[2] == ECX
     //   cpuinfo[3] == EDX
-    void cpuid(uint32 cpuinfo[4], const uint32 index)
+    void cpuid(std::uint32_t cpuinfo[4], const std::uint32_t index)
     {
         __cpuid_count(
             index,
@@ -400,69 +445,84 @@ namespace
             cpuinfo[3]);
     }
 
-    uint64 xgetbv(const int32 index)
+    std::uint64_t xgetbv(const std::int32_t index)
     {
-        uint32 eax, edx;
+        std::uint32_t eax, edx;
         __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
-        return (static_cast<uint64>(edx) << 32) | eax;
+        return (static_cast<std::uint64_t>(edx) << 32) | eax;
     }
 }
 
-size_t System::get_l1_data_cache_size()
+std::size_t System::get_l1_data_cache_count()
+{
+    return sysconf(_SC_LEVEL1_DCACHE_ASSOC);
+}
+
+std::size_t System::get_l1_data_cache_size()
 {
     return sysconf(_SC_LEVEL1_DCACHE_SIZE);
 }
 
-size_t System::get_l1_data_cache_line_size()
+std::size_t System::get_l1_data_cache_line_size()
 {
     return sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 }
 
-size_t System::get_l2_cache_size()
+std::size_t System::get_l2_cache_count()
+{
+    return sysconf(_SC_LEVEL2_CACHE_ASSOC);
+}
+
+std::size_t System::get_l2_cache_size()
 {
     return sysconf(_SC_LEVEL2_CACHE_SIZE);
 }
 
-size_t System::get_l2_cache_line_size()
+std::size_t System::get_l2_cache_line_size()
 {
     return sysconf(_SC_LEVEL2_CACHE_LINESIZE);
 }
 
-size_t System::get_l3_cache_size()
+std::size_t System::get_l3_cache_count()
+{
+    return sysconf(_SC_LEVEL3_CACHE_ASSOC);
+}
+
+std::size_t System::get_l3_cache_size()
 {
     return sysconf(_SC_LEVEL3_CACHE_SIZE);
 }
 
-size_t System::get_l3_cache_line_size()
+std::size_t System::get_l3_cache_line_size()
 {
     return sysconf(_SC_LEVEL3_CACHE_LINESIZE);
 }
 
-uint64 System::get_total_physical_memory_size()
+std::uint64_t System::get_total_physical_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
     struct sysinfo mem_info;
     sysinfo(&mem_info);
 
-    return static_cast<uint64>(mem_info.totalram) * mem_info.mem_unit;
+    return static_cast<std::uint64_t>(mem_info.totalram) * mem_info.mem_unit;
 }
 
-uint64 System::get_total_virtual_memory_size()
+std::uint64_t System::get_total_virtual_memory_size()
 {
     // Reference: http://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 
     struct sysinfo mem_info;
     sysinfo(&mem_info);
 
-    uint64 result = mem_info.totalram;
+    std::uint64_t result = mem_info.totalram;
     result += mem_info.totalswap;
     result *= mem_info.mem_unit;
 
     return result;
 }
 
-uint64 System::get_process_virtual_memory_size()
+std::uint64_t System::get_process_virtual_memory_size()
 {
     // todo: this is wrong, it returns RSS instead of virtual memory.
 
@@ -481,10 +541,10 @@ uint64 System::get_process_virtual_memory_size()
 
     fclose(fp);
 
-    return static_cast<uint64>(rss) * sysconf(_SC_PAGESIZE);
+    return static_cast<std::uint64_t>(rss) * sysconf(_SC_PAGESIZE);
 }
 
-uint64 System::get_peak_process_virtual_memory_size()
+std::uint64_t System::get_peak_process_virtual_memory_size()
 {
     // todo: implement.
     return 0;
@@ -505,9 +565,10 @@ namespace
     // is very simplistic; initially all caches have zero size (i.e. absent).
     struct TrivialX86Cache
     {
-        size_t size;
-        size_t linesize;
-    } x86_caches[3];
+        std::size_t m_associativity;
+        std::size_t m_size;
+        std::size_t m_line_size;
+    } g_x86_caches[3];
 
     enum { L1D, L2, L3 };
     enum { eax, ebx, ecx, edx };
@@ -548,30 +609,32 @@ namespace
         uint32_t regs[4];
 
         // Cycle up to ten possible caches to be extra sure.
-        for (size_t i = 0; i < 10; i++)
+        for (std::size_t i = 0; i < 10; i++)
         {
             regs[eax] = 4;
             regs[ecx] = i;
             cpuid(regs);
 
-            const unsigned type = BITFIELD(regs[eax], 4, 0);
-            if (type == 0) break;    // no more caches, we're done.
-            if (type == 2) continue; // ignore instruction caches.
+            const unsigned int type = BITFIELD(regs[eax], 4, 0);
+            if (type == 0) break;       // no more caches, we're done
+            if (type == 2) continue;    // ignore instruction caches
 
-            const unsigned level = BITFIELD(regs[eax], 7, 5);
-            const unsigned linesize = BITFIELD(regs[ebx], 11, 0) + 1;
-            const unsigned sets = BITFIELD(regs[ecx], 31, 0) + 1;
-            const unsigned associativity = BITFIELD(regs[ebx], 31, 22) + 1;
+            const unsigned int level = BITFIELD(regs[eax], 7, 5);
+            const unsigned int line_size = BITFIELD(regs[ebx], 11, 0) + 1;
+            const unsigned int sets = BITFIELD(regs[ecx], 31, 0) + 1;
+            const unsigned int associativity = BITFIELD(regs[ebx], 31, 22) + 1;
 
             assert(level > 0);
 
-            caches[level - 1].size = linesize * sets * associativity;
-            caches[level - 1].linesize = linesize;
+            caches[level - 1].m_associativity = associativity;
+            caches[level - 1].m_size = line_size * sets;
+            caches[level - 1].m_line_size = line_size;
         }
     }
 
     // On older CPUs we might have to rely on Cache Descriptors (Function 02h)
     // and Intel documentation (table of the known values).
+    // todo: fill m_associativity field.
     void get_cache_info_from_table(TrivialX86Cache* caches)
     {
         uint32_t regs[4];
@@ -586,7 +649,7 @@ namespace
         // safe, but let's add an assert() on the lower 8 bits just in case.
         assert((regs[eax] & 0xFF) == 1);
 
-        for (size_t i = 1; i < 4 * 4; i++)
+        for (std::size_t i = 1; i < 4 * 4; i++)
         {
             // Check descriptor validity for every octet: if bit 31 is set,
             // skip to the next one.
@@ -600,187 +663,187 @@ namespace
             switch ((regs[i / 4] >> (i % 4) * 8) & 0xFF)
             {
               case 0x0A:
-                caches[L1D].size = 8;
-                caches[L1D].linesize = 32;
+                caches[L1D].m_size = 8;
+                caches[L1D].m_line_size = 32;
                 break;
               case 0x0C:
-                caches[L1D].size = 16;
-                caches[L1D].linesize = 32;
+                caches[L1D].m_size = 16;
+                caches[L1D].m_line_size = 32;
                 break;
               case 0x0D:
               case 0x60:
               case 0x67:
-                caches[L1D].size = 16;
-                caches[L1D].linesize = 64;
+                caches[L1D].m_size = 16;
+                caches[L1D].m_line_size = 64;
                 break;
               case 0x21:
               case 0x3C:
               case 0x7A:
-                caches[L2].size = 256;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 256;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x22:
               case 0xD0:
-                caches[L3].size = 512;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 512;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x23:
               case 0xD1:
               case 0xD6:
-                caches[L3].size = 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x25:
               case 0xD2:
               case 0xD7:
               case 0xE2:
-                caches[L3].size = 2048;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 2048;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x29:
               case 0x46:
               case 0xD8:
               case 0xE3:
-                caches[L3].size = 4096;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 4096;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x2C:
-                caches[L1D].size = 32;
-                caches[L1D].linesize = 64;
+                caches[L1D].m_size = 32;
+                caches[L1D].m_line_size = 64;
                 break;
               case 0x39:
               case 0x3B:
               case 0x79:
-                caches[L2].size = 128;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 128;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x3A:
-                caches[L2].size = 192;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 192;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x3D:
-                caches[L2].size = 384;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 384;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x3E:
               case 0x7B:
               case 0x7F:
               case 0x86:
-                caches[L2].size = 512;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 512;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x40:
                 no_higher_level_cache = 1;
                 break;
               case 0x41:
-                caches[L2].size = 128;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 128;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x42:
               case 0x82:
-                caches[L2].size = 256;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 256;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x43:
               case 0x83:
-                caches[L2].size = 512;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 512;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x44:
-                caches[L2].size = 1024;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 1024;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x45:
-                caches[L2].size = 2048;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 2048;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x47:
               case 0x4B:
               case 0xE4:
-                caches[L3].size = 8192;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 8192;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x48:
-                caches[L2].size = 3072;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 3072;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x49:
                 // todo: check for Intel Xeon processor MP, Family 0Fh,
                 // Model 06h, because 0x49 means L3 cache (4MB, 16-way,
                 // 64-byte linesize) for this CPU.
-                caches[L2].size = 4096;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 4096;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x4A:
               case 0xDE:
-                caches[L3].size = 6 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 6 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x4C:
               case 0xEA:
-                caches[L3].size = 12 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 12 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x4D:
-                caches[L3].size = 16 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 16 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0x4E:
-                caches[L2].size = 6 * 1024;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 6 * 1024;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x66:
-                caches[L1D].size = 8;
-                caches[L1D].linesize = 64;
+                caches[L1D].m_size = 8;
+                caches[L1D].m_line_size = 64;
                 break;
               case 0x68:
-                caches[L1D].size = 32;
-                caches[L1D].linesize = 64;
+                caches[L1D].m_size = 32;
+                caches[L1D].m_line_size = 64;
                 break;
               case 0x78:
               case 0x7C:
-                caches[L2].size = 1024;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 1024;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x7D:
-                caches[L2].size = 2048;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 2048;
+                caches[L2].m_line_size = 64;
                 break;
               case 0x84:
-                caches[L2].size = 1024;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 1024;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x85:
-                caches[L2].size = 2048;
-                caches[L2].linesize = 32;
+                caches[L2].m_size = 2048;
+                caches[L2].m_line_size = 32;
                 break;
               case 0x87:
-                caches[L2].size = 1024;
-                caches[L2].linesize = 64;
+                caches[L2].m_size = 1024;
+                caches[L2].m_line_size = 64;
                 break;
               case 0xDC:
-                caches[L3].size = 1536;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 1536;
+                caches[L3].m_line_size = 64;
                 break;
               case 0xDD:
-                caches[L3].size = 3 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 3 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0xEB:
-                caches[L3].size = 18 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 18 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
               case 0xEC:
-                caches[L3].size = 24 * 1024;
-                caches[L3].linesize = 64;
+                caches[L3].m_size = 24 * 1024;
+                caches[L3].m_line_size = 64;
                 break;
             }
         }
 
         // Convert Kbytes to bytes.
-        caches[L1D].size *= 1024;
-        caches[L2].size *= 1024;
-        caches[L3].size *= 1024;
+        caches[L1D].m_size *= 1024;
+        caches[L2].m_size *= 1024;
+        caches[L3].m_size *= 1024;
     }
 
     void x86_get_cache_basic_info(TrivialX86Cache* caches)
@@ -797,63 +860,63 @@ namespace
     }
 }
 
-size_t System::get_l1_data_cache_size()
+std::size_t System::get_l1_data_cache_size()
 {
     // Here and below we'd check for L1D cache size: if it's initialized,
     // it means that x86_get_cache_basic_info() was already called and we
     // don't have to do it again.
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L1D].size;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L1D].m_size;
 }
 
-size_t System::get_l1_data_cache_line_size()
+std::size_t System::get_l1_data_cache_line_size()
 {
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L1D].linesize;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L1D].m_line_size;
 }
 
-size_t System::get_l2_cache_size()
+std::size_t System::get_l2_cache_size()
 {
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L2].size;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L2].m_size;
 }
 
-size_t System::get_l2_cache_line_size()
+std::size_t System::get_l2_cache_line_size()
 {
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L2].linesize;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L2].m_line_size;
 }
 
-size_t System::get_l3_cache_size()
+std::size_t System::get_l3_cache_size()
 {
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L3].size;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L3].m_size;
 }
 
-size_t System::get_l3_cache_line_size()
+std::size_t System::get_l3_cache_line_size()
 {
-    if (!x86_caches[L1D].size)
-        x86_get_cache_basic_info(x86_caches);
-    return x86_caches[L3].linesize;
+    if (!g_x86_caches[L1D].m_size)
+        x86_get_cache_basic_info(g_x86_caches);
+    return g_x86_caches[L3].m_line_size;
 }
 
-uint64 System::get_total_physical_memory_size()
+std::uint64_t System::get_total_physical_memory_size()
 {
     const long pagesize = sysconf(_SC_PAGESIZE);
     const long numpages = sysconf(_SC_PHYS_PAGES);
 
-    return static_cast<uint64>(pagesize) * numpages;
+    return static_cast<std::uint64_t>(pagesize) * numpages;
 }
 
-uint64 System::get_total_virtual_memory_size()
+std::uint64_t System::get_total_virtual_memory_size()
 {
     quad_t swap;
-    size_t len = sizeof(swap);
+    std::size_t len = sizeof(swap);
 
     const int result = sysctlbyname("vm.swap_total", &swap, &len, 0x0, 0);
     assert(result == 0);
@@ -861,7 +924,7 @@ uint64 System::get_total_virtual_memory_size()
     return get_total_physical_memory_size() + swap;
 }
 
-uint64 System::get_process_virtual_memory_size()
+std::uint64_t System::get_process_virtual_memory_size()
 {
     // todo: this is wrong, it returns peak RSS instead of virtual memory.
 
@@ -874,10 +937,10 @@ uint64 System::get_process_virtual_memory_size()
     const int result = getrusage(RUSAGE_SELF, &ru);
     assert(result == 0);
 
-    return static_cast<uint64>(ru.ru_maxrss) * 1024;
+    return static_cast<std::uint64_t>(ru.ru_maxrss) * 1024;
 }
 
-uint64 System::get_peak_process_virtual_memory_size()
+std::uint64_t System::get_peak_process_virtual_memory_size()
 {
     // todo: implement.
     return 0;
@@ -889,33 +952,82 @@ uint64 System::get_peak_process_virtual_memory_size()
 // Common code.
 // ------------------------------------------------------------------------------------------------
 
+#ifdef APPLESEED_WITH_GPU
+
+namespace
+{
+    void print_gpu_information(Logger& logger)
+    {
+        try
+        {
+            const CUDADeviceList& dev_list = CUDADeviceList::instance();
+            if (dev_list.empty())
+            {
+                LOG_INFO(logger, "no GPU device found.\n");
+                return;
+            }
+
+            LOG_INFO(logger, "GPU information:");
+
+            // Devices.
+            LOG_INFO(logger, "  device count                  " FMT_SIZE_T, dev_list.size());
+            for (std::size_t i = 0, e = dev_list.size(); i < e; ++i)
+            {
+                const CUDADevice& dev = dev_list.get_device(i);
+
+                LOG_INFO(
+                    logger,
+                    "    device #" FMT_SIZE_T ":\n"
+                    "      name                      %s\n"
+                    "      compute capability        %d.%d\n"
+                    "      memory                    %s",
+                    i,
+                    dev.m_name.c_str(),
+                    dev.m_compute_capability_major,
+                    dev.m_compute_capability_minor,
+                    pretty_size(dev.m_total_mem).c_str());
+            }
+
+            // Driver version.
+            int cuda_version;
+            check_cuda_result(cuDriverGetVersion(&cuda_version));
+            const int major_cuda_version = cuda_version / 1000;
+            const int minor_cuda_version = (cuda_version % 1000) / 10;
+            LOG_INFO(logger, "  CUDA version                  %d.%d", major_cuda_version, minor_cuda_version);
+
+            // OptiX version.
+            unsigned int optix_version;
+            if (rtGetVersion(&optix_version) == RT_SUCCESS)
+            {
+                const unsigned int major_optix_version = optix_version / 10000;
+                const unsigned int minor_optix_version = (optix_version % 10000) / 100;
+                const unsigned int micro_optix_version = optix_version % 100;
+                LOG_INFO(
+                    logger,
+                    "  OptiX version                 %u.%u.%u",
+                    major_optix_version,
+                    minor_optix_version,
+                    micro_optix_version);
+            }
+        }
+        catch (const ExceptionCUDAError& e)
+        {
+            LOG_ERROR(logger, "%s", e.what());
+            return;
+        }
+    }
+}
+
+#endif
+
 void System::print_information(Logger& logger)
 {
 #ifdef APPLESEED_X86
     X86CPUFeatures features;
     detect_x86_cpu_features(features);
-
-    stringstream isabuilder;
-    if (features.m_hw_sse) isabuilder << "SSE ";
-    if (features.m_hw_sse2) isabuilder << "SSE2 ";
-    if (features.m_hw_sse3) isabuilder << "SSE3 ";
-    if (features.m_hw_ssse3) isabuilder << "SSSE3 ";
-    if (features.m_hw_sse41) isabuilder << "SSE4.1 ";
-    if (features.m_hw_sse42) isabuilder << "SSE4.2 ";
-    if (features.m_hw_sse4a) isabuilder << "SSE4a ";
-    if (features.m_hw_avx) isabuilder << "AVX ";
-    if (features.m_hw_avx2) isabuilder << "AVX2 ";
-    if (features.m_hw_fma3) isabuilder << "FMA3 ";
-    if (features.m_hw_f16c) isabuilder << "F16C ";
-
-    const string isa =
-        isabuilder.str().empty()
-            ? "base instruction set"
-            : trim_right(isabuilder.str());
-#else
-    const string isa = "base instruction set";
 #endif
 
+    // Can't use LOG_INFO() here because of the #ifdefs.
     logger.write(
         LogMessage::Info,
         __FILE__,
@@ -926,12 +1038,12 @@ void System::print_information(Logger& logger)
         "  vendor                        %s\n"
 #endif
         "  logical cores                 %s\n"
-        "  L1 data cache                 size %s, line size %s\n"
-        "  L2 cache                      size %s, line size %s\n"
-        "  L3 cache                      size %s, line size %s\n"
+        "  L1 data cache                 " FMT_SIZE_T " x %s, line size %s\n"
+        "  L2 cache                      " FMT_SIZE_T " x %s, line size %s\n"
+        "  L3 cache                      " FMT_SIZE_T " x %s, line size %s\n"
         "  instruction sets              %s\n"
-        "  physical memory               size %s\n"
-        "  virtual memory                size %s\n"
+        "  physical memory               %s\n"
+        "  virtual memory                %s\n"
         "  default wallclock timer       %s Hz\n"
         "  default processor timer       %s Hz",
         get_cpu_architecture(),
@@ -941,17 +1053,24 @@ void System::print_information(Logger& logger)
         "unknown",
 #endif
         pretty_uint(get_logical_cpu_core_count()).c_str(),
+        get_l1_data_cache_count(),
         pretty_size(get_l1_data_cache_size()).c_str(),
         pretty_size(get_l1_data_cache_line_size()).c_str(),
+        get_l2_cache_count(),
         pretty_size(get_l2_cache_size()).c_str(),
         pretty_size(get_l2_cache_line_size()).c_str(),
+        get_l3_cache_count(),
         pretty_size(get_l3_cache_size()).c_str(),
         pretty_size(get_l3_cache_line_size()).c_str(),
-        isa.c_str(),
+        get_cpu_features_string().c_str(),
         pretty_size(get_total_physical_memory_size()).c_str(),
         pretty_size(get_total_virtual_memory_size()).c_str(),
         pretty_uint(DefaultWallclockTimer().frequency()).c_str(),
         pretty_uint(DefaultProcessorTimer().frequency()).c_str());
+
+#ifdef APPLESEED_WITH_GPU
+    print_gpu_information(logger);
+#endif
 }
 
 const char* System::get_cpu_architecture()
@@ -971,10 +1090,10 @@ const char* System::get_cpu_architecture()
 #endif
 }
 
-size_t System::get_logical_cpu_core_count()
+std::size_t System::get_logical_cpu_core_count()
 {
-    const size_t concurrency =
-        static_cast<size_t>(boost::thread::hardware_concurrency());
+    const std::size_t concurrency =
+        static_cast<std::size_t>(boost::thread::hardware_concurrency());
 
     return concurrency > 1 ? concurrency : 1;
 }
@@ -992,7 +1111,7 @@ namespace
     {
         // Reference: http://stackoverflow.com/a/22521619/922184
 
-        uint32 cpuinfo[4];
+        std::uint32_t cpuinfo[4];
         cpuid(cpuinfo, 1);
 
         const bool os_uses_xsave_xrstor = (cpuinfo[2] & (1UL << 27)) != 0;
@@ -1000,7 +1119,7 @@ namespace
 
         if (os_uses_xsave_xrstor && cpu_avx_support)
         {
-            const uint64 xcr_feature_mask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+            const std::uint64_t xcr_feature_mask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
             return (xcr_feature_mask & 0x6) == 0x6;
         }
 
@@ -1012,15 +1131,15 @@ namespace
         if (!detect_os_avx())
             return false;
 
-        const uint64 xcr_feature_mask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+        const std::uint64_t xcr_feature_mask = xgetbv(_XCR_XFEATURE_ENABLED_MASK);
         return (xcr_feature_mask & 0xe6) == 0xe6;
     }
 
-    string get_vendor_string()
+    std::string get_vendor_string()
     {
         char vendor[13];
 
-        uint32 cpuinfo[4];
+        std::uint32_t cpuinfo[4];
         cpuid(cpuinfo, 0);
 
         memcpy(vendor + 0, &cpuinfo[1], 4);
@@ -1042,16 +1161,16 @@ void System::detect_x86_cpu_features(X86CPUFeatures& features)
     memset(&features, 0, sizeof(features));
 
     // CPU vendor.
-    const string vendor = get_vendor_string();
+    const std::string vendor = get_vendor_string();
     features.m_vendor =
         vendor == "GenuineIntel" ? X86CPUFeatures::Vendor::Intel :
         vendor == "AuthenticAMD" ? X86CPUFeatures::Vendor::AMD :
         X86CPUFeatures::Vendor::Unknown;
 
     // EAX=0: Get vendor ID.
-    uint32 cpuinfo[4];
+    std::uint32_t cpuinfo[4];
     cpuid(cpuinfo, 0x00000000);
-    const uint32 highest_function_id = cpuinfo[0];
+    const std::uint32_t highest_function_id = cpuinfo[0];
 
     if (highest_function_id >= 0x00000001)
     {
@@ -1095,7 +1214,7 @@ void System::detect_x86_cpu_features(X86CPUFeatures& features)
 
     // EAX=0x80000000: Get Highest Extended Function Supported.
     cpuid(cpuinfo, 0x80000000);
-    const uint32 highest_ext_function_id = cpuinfo[0];
+    const std::uint32_t highest_ext_function_id = cpuinfo[0];
 
     if (highest_ext_function_id >= 0x80000001)
     {
@@ -1114,5 +1233,33 @@ void System::detect_x86_cpu_features(X86CPUFeatures& features)
 }
 
 #endif
+
+APIString System::get_cpu_features_string()
+{
+#ifdef APPLESEED_X86
+    X86CPUFeatures features;
+    detect_x86_cpu_features(features);
+
+    std::stringstream isabuilder;
+    if (features.m_hw_sse) isabuilder << "SSE ";
+    if (features.m_hw_sse2) isabuilder << "SSE2 ";
+    if (features.m_hw_sse3) isabuilder << "SSE3 ";
+    if (features.m_hw_ssse3) isabuilder << "SSSE3 ";
+    if (features.m_hw_sse41) isabuilder << "SSE4.1 ";
+    if (features.m_hw_sse42) isabuilder << "SSE4.2 ";
+    if (features.m_hw_sse4a) isabuilder << "SSE4a ";
+    if (features.m_hw_avx) isabuilder << "AVX ";
+    if (features.m_hw_avx2) isabuilder << "AVX2 ";
+    if (features.m_hw_fma3) isabuilder << "FMA3 ";
+    if (features.m_hw_f16c) isabuilder << "F16C ";
+
+    return
+        isabuilder.str().empty()
+            ? "base instruction set"
+            : trim_right(isabuilder.str());
+#else
+    return "base instruction set";
+#endif
+}
 
 }   // namespace foundation

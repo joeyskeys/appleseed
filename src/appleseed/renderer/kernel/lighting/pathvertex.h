@@ -70,7 +70,7 @@ class PathVertex
     // Path properties.
     size_t                      m_path_length;
     int                         m_scattering_modes;
-    Spectrum                    m_throughput;
+    Spectrum                    m_throughput;   // cumulative throughput (percent of incoming light which is reflected as outgoing light) of this path, up to but excluding this vertex
 
     // Current vertex properties.
     const ShadingPoint*         m_shading_point;
@@ -91,8 +91,6 @@ class PathVertex
 
     // AOV properties.
     ScatteringMode::Mode        m_aov_mode;
-    Spectrum                    m_albedo;
-    bool                        m_albedo_saved;
 
     // Constructor.
     explicit PathVertex(SamplingContext& sampling_context);
@@ -126,7 +124,6 @@ class PathVertex
 
 inline PathVertex::PathVertex(SamplingContext& sampling_context)
   : m_sampling_context(sampling_context)
-  , m_albedo_saved(false)
 {
 }
 

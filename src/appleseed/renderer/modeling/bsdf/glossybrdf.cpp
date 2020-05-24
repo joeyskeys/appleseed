@@ -39,25 +39,21 @@
 #include "renderer/modeling/bsdf/fresnel.h"
 #include "renderer/modeling/bsdf/microfacethelper.h"
 #include "renderer/modeling/bsdf/specularhelper.h"
-#include "renderer/utility/messagecontext.h"
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/microfacet.h"
-#include "foundation/math/minmax.h"
-#include "foundation/math/sampling/mappings.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/makevector.h"
-#include "foundation/utility/otherwise.h"
 
 // Standard headers.
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <string>
 
 // Forward declarations.
 namespace foundation    { class IAbortSwitch; }
@@ -65,7 +61,6 @@ namespace renderer      { class Assembly; }
 namespace renderer      { class Project; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -86,6 +81,9 @@ namespace
     //   [3] Revisiting Physically Based Shading at Imageworks
     //       http://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_slides.pdf
     //
+    //   [4] Practical multiple scattering compensation for microfacet models
+    //       https://blog.selfshadow.com/publications/turquin/ms_comp_final.pdf
+    //
 
     const char* Model = "glossy_brdf";
 
@@ -101,7 +99,6 @@ namespace
             m_inputs.declare("reflectance", InputFormatSpectralReflectance);
             m_inputs.declare("reflectance_multiplier", InputFormatFloat, "1.0");
             m_inputs.declare("roughness", InputFormatFloat, "0.15");
-            m_inputs.declare("highlight_falloff", InputFormatFloat, "0.4");
             m_inputs.declare("anisotropy", InputFormatFloat, "0.0");
             m_inputs.declare("ior", InputFormatFloat, "1.5");
             m_inputs.declare("fresnel_weight", InputFormatFloat, "1.0");
@@ -118,35 +115,6 @@ namespace
             return Model;
         }
 
-        bool on_frame_begin(
-            const Project&              project,
-            const BaseGroup*            parent,
-            OnFrameBeginRecorder&       recorder,
-            IAbortSwitch*               abort_switch) override
-        {
-            if (!BSDF::on_frame_begin(project, parent, recorder, abort_switch))
-                return false;
-
-            const OnFrameBeginMessageContext context("bsdf", this);
-
-            const string mdf =
-                m_params.get_required<string>(
-                    "mdf",
-                    "ggx",
-                    make_vector("beckmann", "ggx", "std"),
-                    context);
-
-            if (mdf == "ggx")
-                m_mdf_type = GGX;
-            else if (mdf == "beckmann")
-                m_mdf_type = Beckmann;
-            else if (mdf == "std")
-                m_mdf_type = Std;
-            else return false;
-
-            return true;
-        }
-
         size_t compute_input_data_size() const override
         {
             return sizeof(InputValues);
@@ -159,14 +127,14 @@ namespace
         {
             InputValues* values = static_cast<InputValues*>(data);
 
-            values->m_roughness = max(values->m_roughness, shading_point.get_ray().m_min_roughness);
+            values->m_roughness = std::max(values->m_roughness, shading_point.get_ray().m_min_roughness);
 
             new (&values->m_precomputed) InputValues::Precomputed();
             values->m_precomputed.m_outside_ior = shading_point.get_ray().get_current_ior();
 
-            values->m_precomputed.m_fresnel_average =
-                average_fresnel_reflectance_dielectric(
-                    values->m_ior / values->m_precomputed.m_outside_ior);
+            normal_reflectance_dielectric(
+                values->m_precomputed.m_F0,
+                values->m_ior / values->m_precomputed.m_outside_ior);
         }
 
         void sample(
@@ -174,6 +142,8 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
@@ -190,7 +160,7 @@ namespace
             {
                 if (ScatteringMode::has_specular(modes))
                 {
-                    SpecularBRDFHelper::sample(f, sample);
+                    SpecularBRDFHelper::sample(f, local_geometry, outgoing, sample);
                     sample.m_value.m_beauty = sample.m_value.m_glossy;
                 }
 
@@ -206,80 +176,25 @@ namespace
                     alpha_x,
                     alpha_y);
 
-                switch (m_mdf_type)
+                MicrofacetBRDFHelper<GGXMDF>::sample(
+                    sampling_context,
+                    values->m_roughness,
+                    alpha_x,
+                    alpha_y,
+                    f,
+                    local_geometry,
+                    outgoing,
+                    sample);
+
+                if (sample.get_mode() != ScatteringMode::None)
                 {
-                  case GGX:
-                    {
-                        const GGXMDF mdf;
-                        MicrofacetBRDFHelper<true>::sample(
-                            sampling_context,
-                            mdf,
-                            alpha_x,
-                            alpha_y,
-                            1.0f,
-                            f,
-                            sample);
+                    apply_energy_compensation_factor(
+                        values,
+                        outgoing.get_value(),
+                        local_geometry.m_shading_basis.get_normal(),
+                        sample.m_value.m_glossy);
 
-                        if (sample.get_mode() != ScatteringMode::None)
-                        {
-                            add_energy_compensation_term(
-                                mdf,
-                                values,
-                                sample.m_outgoing.get_value(),
-                                sample.m_incoming.get_value(),
-                                sample.m_shading_basis.get_normal(),
-                                sample.m_value.m_glossy);
-
-                            sample.m_min_roughness = values->m_roughness;
-                        }
-                    }
-                    break;
-
-                  case Beckmann:
-                    {
-                        const BeckmannMDF mdf;
-                        MicrofacetBRDFHelper<true>::sample(
-                            sampling_context,
-                            mdf,
-                            alpha_x,
-                            alpha_y,
-                            1.0f,
-                            f,
-                            sample);
-
-                        if (sample.get_mode() != ScatteringMode::None)
-                        {
-                            add_energy_compensation_term(
-                                mdf,
-                                values,
-                                sample.m_outgoing.get_value(),
-                                sample.m_incoming.get_value(),
-                                sample.m_shading_basis.get_normal(),
-                                sample.m_value.m_glossy);
-
-                            sample.m_min_roughness = values->m_roughness;
-                        }
-                    }
-                    break;
-
-                  case Std:
-                    {
-                        const StdMDF mdf;
-                        MicrofacetBRDFHelper<true>::sample(
-                            sampling_context,
-                            mdf,
-                            alpha_x,
-                            alpha_y,
-                            highlight_falloff_to_gama(values->m_highlight_falloff),
-                            f,
-                            sample);
-
-                        if (sample.get_mode() != ScatteringMode::None)
-                            sample.m_min_roughness = values->m_roughness;
-                    }
-                    break;
-
-                  assert_otherwise;
+                    sample.m_min_roughness = values->m_roughness;
                 }
 
                 sample.m_value.m_beauty = sample.m_value.m_glossy;
@@ -290,8 +205,7 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -315,79 +229,21 @@ namespace
                 values->m_precomputed.m_outside_ior / values->m_ior,
                 values->m_fresnel_weight);
 
-            float pdf;
+            const float pdf =
+                MicrofacetBRDFHelper<GGXMDF>::evaluate(
+                    alpha_x,
+                    alpha_y,
+                    f,
+                    local_geometry,
+                    outgoing,
+                    incoming,
+                    value.m_glossy);
 
-            switch (m_mdf_type)
-            {
-              case GGX:
-                {
-                    const GGXMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::evaluate(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        1.0f,
-                        shading_basis,
-                        outgoing,
-                        incoming,
-                        f,
-                        value.m_glossy);
-
-                    add_energy_compensation_term(
-                        mdf,
-                        values,
-                        outgoing,
-                        incoming,
-                        shading_basis.get_normal(),
-                        value.m_glossy);
-                }
-                break;
-
-              case Beckmann:
-                {
-                    const BeckmannMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::evaluate(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        1.0f,
-                        shading_basis,
-                        outgoing,
-                        incoming,
-                        f,
-                        value.m_glossy);
-
-                    add_energy_compensation_term(
-                        mdf,
-                        values,
-                        outgoing,
-                        incoming,
-                        shading_basis.get_normal(),
-                        value.m_glossy);
-                }
-                break;
-
-              case Std:
-                {
-                    const StdMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::evaluate(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        highlight_falloff_to_gama(values->m_highlight_falloff),
-                        shading_basis,
-                        outgoing,
-                        incoming,
-                        f,
-                        value.m_glossy);
-                }
-                break;
-
-              default:
-                assert(!"Unexpected MDF type.");
-                pdf = 0.0f;
-                break;
-            }
+            apply_energy_compensation_factor(
+                values,
+                outgoing,
+                local_geometry.m_shading_basis.get_normal(),
+                value.m_glossy);
 
             value.m_beauty = value.m_glossy;
 
@@ -398,8 +254,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override
@@ -416,57 +271,13 @@ namespace
                 alpha_x,
                 alpha_y);
 
-            float pdf;
-
-            switch (m_mdf_type)
-            {
-              case GGX:
-                {
-                    const GGXMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::pdf(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        1.0f,
-                        shading_basis,
-                        outgoing,
-                        incoming);
-                }
-                break;
-
-              case Beckmann:
-                {
-                    const BeckmannMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::pdf(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        1.0f,
-                        shading_basis,
-                        outgoing,
-                        incoming);
-                }
-                break;
-
-              case Std:
-                {
-                    const StdMDF mdf;
-                    pdf = MicrofacetBRDFHelper<true>::pdf(
-                        mdf,
-                        alpha_x,
-                        alpha_y,
-                        highlight_falloff_to_gama(values->m_highlight_falloff),
-                        shading_basis,
-                        outgoing,
-                        incoming);
-                }
-                break;
-
-              default:
-                assert(!"Unexpected MDF type.");
-                pdf = 0.0f;
-                break;
-            }
+            const float pdf =
+                MicrofacetBRDFHelper<GGXMDF>::pdf(
+                    alpha_x,
+                    alpha_y,
+                    local_geometry,
+                    outgoing,
+                    incoming);
 
             assert(pdf >= 0.0f);
             return pdf;
@@ -475,52 +286,29 @@ namespace
       private:
         typedef GlossyBRDFInputValues InputValues;
 
-        template <typename MDF>
-        static void add_energy_compensation_term(
-            const MDF&                  mdf,
+        static void apply_energy_compensation_factor(
             const InputValues*          values,
             const Vector3f&             outgoing,
-            const Vector3f&             incoming,
             const Vector3f&             n,
             Spectrum&                   value)
         {
             if (values->m_energy_compensation != 0.0f)
             {
-                const float cos_on = dot(outgoing, n);
-                const float cos_in = dot(incoming, n);
+                const float Ess = get_directional_albedo(
+                    std::abs(dot(outgoing, n)),
+                    values->m_roughness);
 
-                float fms;
-                float eavg;
-                microfacet_energy_compensation_term(
-                    mdf,
-                    values->m_roughness,
-                    cos_in,
-                    cos_on,
-                    fms,
-                    eavg);
+                if (Ess == 0.0f)
+                    return;
+
+                float fms = (1.0f - Ess) / Ess;
 
                 if (values->m_fresnel_weight != 0.0f)
-                {
-                    const float fterm =
-                        (square(values->m_precomputed.m_fresnel_average) * eavg) / (1.0f - values->m_precomputed.m_fresnel_average * (1.0f - eavg));
-                    fms *= lerp(1.0f, fterm, values->m_fresnel_weight);
-                }
+                    fms *= lerp(1.0f, values->m_precomputed.m_F0, values->m_fresnel_weight);
 
-                madd(
-                    value,
-                    values->m_reflectance,
-                    values->m_energy_compensation * values->m_reflectance_multiplier * fms);
+                value *= 1.0f + (values->m_energy_compensation * fms);
             }
         }
-
-        enum MDFType
-        {
-            GGX = 0,
-            Beckmann,
-            Std
-        };
-
-        MDFType m_mdf_type;
     };
 
     typedef BSDFWrapper<GlossyBRDFImpl> GlossyBRDF;
@@ -552,19 +340,6 @@ Dictionary GlossyBRDFFactory::get_model_metadata() const
 DictionaryArray GlossyBRDFFactory::get_input_metadata() const
 {
     DictionaryArray metadata;
-
-    metadata.push_back(
-        Dictionary()
-            .insert("name", "mdf")
-            .insert("label", "Microfacet Distribution Function")
-            .insert("type", "enumeration")
-            .insert("items",
-                Dictionary()
-                    .insert("Beckmann", "beckmann")
-                    .insert("GGX", "ggx")
-                    .insert("STD", "std"))
-            .insert("use", "required")
-            .insert("default", "ggx"));
 
     metadata.push_back(
         Dictionary()
@@ -607,22 +382,6 @@ DictionaryArray GlossyBRDFFactory::get_input_metadata() const
                     .insert("value", "1.0")
                     .insert("type", "hard"))
             .insert("default", "0.15"));
-
-    metadata.push_back(
-        Dictionary()
-            .insert("name", "highlight_falloff")
-            .insert("label", "Highlight Falloff")
-            .insert("type", "numeric")
-            .insert("min",
-                Dictionary()
-                    .insert("value", "0.0")
-                    .insert("type", "hard"))
-            .insert("max",
-                Dictionary()
-                    .insert("value", "1.0")
-                    .insert("type", "hard"))
-            .insert("use", "optional")
-            .insert("default", "0.4"));
 
     metadata.push_back(
         Dictionary()

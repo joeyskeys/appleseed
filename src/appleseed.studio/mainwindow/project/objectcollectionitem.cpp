@@ -36,16 +36,18 @@
 #include "mainwindow/project/objectitem.h"
 #include "mainwindow/project/projectbuilder.h"
 #include "mainwindow/rendering/renderingmanager.h"
-#include "utility/miscellaneous.h"
 #include "utility/settingskeys.h"
+
+// appleseed.qtcommon headers.
+#include "utility/miscellaneous.h"
 
 // appleseed.renderer headers.
 #include "renderer/api/utility.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/transform.h"
-#include "foundation/utility/autoreleaseptr.h"
-#include "foundation/utility/containers/dictionary.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/searchpaths.h"
 #include "foundation/utility/uid.h"
 
@@ -62,9 +64,9 @@
 #include <cassert>
 #include <cstddef>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace appleseed {
@@ -137,19 +139,19 @@ void ObjectCollectionItem::slot_import_objects()
         return;
 
     m_editor_context.m_rendering_manager.schedule_or_execute(
-        unique_ptr<RenderingManager::IScheduledAction>(
+        std::unique_ptr<RenderingManager::IScheduledAction>(
             new ImportObjectsAction(this, filepaths)));
 }
 
 void ObjectCollectionItem::import_objects(const QStringList& filepaths)
 {
     for (int i = 0; i < filepaths.size(); ++i)
-        insert_objects(QDir::toNativeSeparators(filepaths[i]).toStdString());
+        insert_objects(filepaths[i].toStdString());
 }
 
-void ObjectCollectionItem::insert_objects(const string& path) const
+void ObjectCollectionItem::insert_objects(const std::string& path) const
 {
-    const string base_object_name =
+    const std::string base_object_name =
         bf::path(path).replace_extension().filename().string();
 
     ParamArray params;
@@ -173,7 +175,7 @@ void ObjectCollectionItem::insert_objects(const string& path) const
 
         m_parent.objects().insert(auto_release_ptr<Object>(object));
 
-        const string object_instance_name = string(object->get_name()) + "_inst";
+        const std::string object_instance_name = std::string(object->get_name()) + "_inst";
 
         auto_release_ptr<ObjectInstance> object_instance(
             ObjectInstanceFactory::create(

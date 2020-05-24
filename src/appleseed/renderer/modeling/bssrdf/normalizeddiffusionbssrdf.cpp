@@ -34,9 +34,9 @@
 #include "renderer/modeling/bssrdf/sss.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <algorithm>
@@ -49,7 +49,6 @@ namespace renderer      { class BSSRDFSample; }
 namespace renderer      { class ShadingContext; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -145,7 +144,7 @@ namespace
             {
                 const float l = values->m_mfp[i];
                 const float s = values->m_precomputed.m_s[i];
-                max_radius = max(max_radius, normalized_diffusion_max_radius(l, s));
+                max_radius = std::max(max_radius, normalized_diffusion_max_radius(l, s));
             }
             values->m_base_values.m_max_disk_radius = max_radius;
         }
@@ -156,21 +155,24 @@ namespace
             const void*             data,
             const ShadingPoint&     outgoing_point,
             const Vector3f&         outgoing_dir,
+            const int               modes,
             BSSRDFSample&           bssrdf_sample,
             BSDFSample&             bsdf_sample) const override
         {
             const NormalizedDiffusionBSSRDFInputValues* values =
                 static_cast<const NormalizedDiffusionBSSRDFInputValues*>(data);
 
-            return do_sample(
-                shading_context,
-                sampling_context,
-                data,
-                values->m_base_values,
-                outgoing_point,
-                outgoing_dir,
-                bssrdf_sample,
-                bsdf_sample);
+            return
+                do_sample(
+                    shading_context,
+                    sampling_context,
+                    data,
+                    values->m_base_values,
+                    outgoing_point,
+                    outgoing_dir,
+                    modes,
+                    bssrdf_sample,
+                    bsdf_sample);
         }
 
         float sample_profile(

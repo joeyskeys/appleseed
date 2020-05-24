@@ -46,6 +46,8 @@
 #include "mainwindow/project/texturecollectionitem.h"
 #include "mainwindow/project/tools.h"
 #include "mainwindow/rendering/renderingmanager.h"
+
+// appleseed.qtcommon headers.
 #include "utility/miscellaneous.h"
 
 // appleseed.renderer headers.
@@ -62,7 +64,7 @@
 #include "renderer/api/volume.h"
 
 // appleseed.foundation headers.
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/utility/foreach.h"
 #include "foundation/utility/uid.h"
 
@@ -76,9 +78,9 @@
 #include <string>
 #include <vector>
 
+using namespace appleseed::qtcommon;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 
 namespace appleseed {
 namespace studio {
@@ -99,7 +101,7 @@ AssemblyItem::AssemblyItem(
   , m_parent(parent)
   , m_parent_item(parent_item)
 {
-    set_title(QString::fromUtf8(assembly.get_name()));
+    set_title(assembly.get_name());
 
     set_allow_edition(false);
 
@@ -183,7 +185,6 @@ QMenu* AssemblyItem::get_single_item_context_menu() const
     menu->addAction("Create Volume...", m_volume_collection_item, SLOT(slot_create()));
 
     QMenu* submenu = menu->addMenu("Create Material...");
-    submenu->addAction("Create Disney Material...", m_material_collection_item, SLOT(slot_create_disney()));
     submenu->addAction("Create Generic Material...", m_material_collection_item, SLOT(slot_create_generic()));
 
     menu->addAction("Create Surface Shader...", m_surface_shader_collection_item, SLOT(slot_create()));
@@ -251,21 +252,21 @@ AssemblyItem::ObjectInstanceCollectionItem& AssemblyItem::get_object_instance_co
     return *m_object_instance_collection_item;
 }
 
-void AssemblyItem::instantiate(const string& name)
+void AssemblyItem::instantiate(const std::string& name)
 {
     m_editor_context.m_rendering_manager.schedule_or_execute(
-        unique_ptr<RenderingManager::IScheduledAction>(
+        std::unique_ptr<RenderingManager::IScheduledAction>(
             new EntityInstantiationAction<AssemblyItem>(this, name)));
 }
 
 void AssemblyItem::slot_instantiate()
 {
-    const string instance_name_suggestion =
+    const std::string instance_name_suggestion =
         make_unique_name(
-            string(m_assembly.get_name()) + "_inst",
+            std::string(m_assembly.get_name()) + "_inst",
             m_parent.assembly_instances());
 
-    const string instance_name =
+    const std::string instance_name =
         get_entity_name_dialog(
             treeWidget(),
             "Instantiate Assembly",
@@ -276,7 +277,7 @@ void AssemblyItem::slot_instantiate()
         instantiate(instance_name);
 }
 
-void AssemblyItem::do_instantiate(const string& name)
+void AssemblyItem::do_instantiate(const std::string& name)
 {
     auto_release_ptr<AssemblyInstance> assembly_instance(
         AssemblyInstanceFactory::create(
@@ -330,8 +331,7 @@ namespace
         QMessageBox msgbox;
         msgbox.setWindowTitle("Delete Assembly?");
         msgbox.setIcon(QMessageBox::Question);
-        msgbox.setText(QString("You are about to delete the assembly \"%1\" and all its instances.").arg(assembly_name));
-        msgbox.setInformativeText("Continue?");
+        msgbox.setText(QString("You are about to delete the assembly \"%1\" and all its instances.\n\nContinue?").arg(assembly_name));
         msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
         msgbox.setDefaultButton(QMessageBox::No);
         return msgbox.exec();
@@ -340,11 +340,11 @@ namespace
 
 namespace
 {
-    vector<UniqueID> collect_assembly_instances(
+    std::vector<UniqueID> collect_assembly_instances(
         const AssemblyInstanceContainer&    assembly_instances,
         const UniqueID                      assembly_uid)
     {
-        vector<UniqueID> collected;
+        std::vector<UniqueID> collected;
 
         for (const_each<AssemblyInstanceContainer> i = assembly_instances; i; ++i)
         {
@@ -365,11 +365,11 @@ namespace
         AssemblyInstanceContainer& assembly_instances = base_group.assembly_instances();
 
         // Collect the assembly instances to remove.
-        const vector<UniqueID> remove_list =
+        const std::vector<UniqueID> remove_list =
             collect_assembly_instances(assembly_instances, assembly_uid);
 
         // Remove assembly instances and their corresponding project items.
-        for (const_each<vector<UniqueID>> i = remove_list; i; ++i)
+        for (const_each<std::vector<UniqueID>> i = remove_list; i; ++i)
         {
             assembly_instances.remove(*i);
             delete item_registry.get_item(*i);
@@ -384,7 +384,7 @@ namespace
 void AssemblyItem::delete_multiple(const QList<ItemBase*>& items)
 {
     m_editor_context.m_rendering_manager.schedule_or_execute(
-        unique_ptr<RenderingManager::IScheduledAction>(
+        std::unique_ptr<RenderingManager::IScheduledAction>(
             new EntityDeletionAction<AssemblyItem>(
                 qlist_static_cast<AssemblyItem*>(items))));
 }

@@ -108,6 +108,7 @@ class AlbedoTable3D
 
   protected:
     AlbedoTable3D(const float min_eta, const float max_eta);
+
     AlbedoTable3D(const float* table, const float min_eta, const float max_eta);
 
     ~AlbedoTable3D();

@@ -37,12 +37,13 @@
 #include "renderer/modeling/bsdf/bsdfwrapper.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/math/basis.h"
+#include "foundation/math/dual.h"
 #include "foundation/math/sampling/mappings.h"
 #include "foundation/math/scalar.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <algorithm>
@@ -54,7 +55,6 @@ namespace renderer      { class Assembly; }
 namespace renderer      { class Project; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -101,6 +101,8 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
+            const LocalGeometry&        local_geometry,
+            const Dual3f&               outgoing,
             const int                   modes,
             BSDFSample&                 sample) const override
         {
@@ -111,7 +113,7 @@ namespace
             sampling_context.split_in_place(2, 1);
             const Vector2f s = sampling_context.next2<Vector2f>();
             const Vector3f wi = sample_hemisphere_cosine(s);
-            const Vector3f incoming = sample.m_shading_basis.transform_to_parent(wi);
+            const Vector3f incoming = local_geometry.m_shading_basis.transform_to_parent(wi);
             sample.m_incoming = Dual3f(incoming);
 
             // Compute the probability density of the sampled direction.
@@ -127,22 +129,21 @@ namespace
                 const InputValues* values = static_cast<const InputValues*>(data);
                 if (values->m_roughness != 0.0f)
                 {
-                    const Vector3f& n = sample.m_shading_basis.get_normal();
+                    const Vector3f& n = local_geometry.m_shading_basis.get_normal();
 
                     // No reflection below the shading surface.
                     const float cos_in = dot(incoming, n);
                     if (cos_in < 0.0f)
                         return;
 
-                    const Vector3f& outgoing = sample.m_outgoing.get_value();
-                    const float cos_on = abs(dot(outgoing, n));
-                    oren_nayar_qualitative(
+                    const float cos_on = std::abs(dot(outgoing.get_value(), n));
+                    oren_nayar(
                         cos_on,
                         cos_in,
                         values->m_roughness,
                         values->m_reflectance,
                         values->m_reflectance_multiplier,
-                        outgoing,
+                        outgoing.get_value(),
                         incoming,
                         n,
                         sample.m_value.m_diffuse);
@@ -160,7 +161,7 @@ namespace
                 sample.m_value.m_beauty = sample.m_value.m_diffuse;
                 sample.m_min_roughness = 1.0f;
 
-                sample.compute_reflected_differentials();
+                sample.compute_diffuse_differentials(outgoing);
             }
         }
 
@@ -168,8 +169,7 @@ namespace
             const void*                 data,
             const bool                  adjoint,
             const bool                  cosine_mult,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes,
@@ -178,15 +178,15 @@ namespace
             if (!ScatteringMode::has_diffuse(modes))
                 return 0.0f;
 
-            const Vector3f& n = shading_basis.get_normal();
-            const float cos_in = abs(dot(incoming, n));
+            const Vector3f& n = local_geometry.m_shading_basis.get_normal();
+            const float cos_in = std::abs(dot(incoming, n));
 
             // Compute the BRDF value.
             const InputValues* values = static_cast<const InputValues*>(data);
             if (values->m_roughness != 0.0f)
             {
-                const float cos_on = abs(dot(outgoing, n));
-                oren_nayar_qualitative(
+                const float cos_on = std::abs(dot(outgoing, n));
+                oren_nayar(
                     cos_on,
                     cos_in,
                     values->m_roughness,
@@ -215,8 +215,7 @@ namespace
         float evaluate_pdf(
             const void*                 data,
             const bool                  adjoint,
-            const Vector3f&             geometric_normal,
-            const Basis3f&              shading_basis,
+            const LocalGeometry&        local_geometry,
             const Vector3f&             outgoing,
             const Vector3f&             incoming,
             const int                   modes) const override
@@ -224,8 +223,8 @@ namespace
             if (!ScatteringMode::has_diffuse(modes))
                 return 0.0f;
 
-            const Vector3f& n = shading_basis.get_normal();
-            const float cos_in = abs(dot(incoming, n));
+            const Vector3f& n = local_geometry.m_shading_basis.get_normal();
+            const float cos_in = std::abs(dot(incoming, n));
 
             // Compute the probability density of the sampled direction.
             const float pdf = cos_in * RcpPi<float>();
@@ -237,7 +236,7 @@ namespace
       private:
         typedef OrenNayarBRDFInputValues InputValues;
 
-        static void oren_nayar_qualitative(
+        static void oren_nayar(
             const float                 cos_on,
             const float                 cos_in,
             const float                 roughness,
@@ -249,10 +248,10 @@ namespace
             Spectrum&                   value)
         {
             const float sigma2 = square(roughness);
-            const float theta_r = min(acos(cos_on), HalfPi<float>());
-            const float theta_i = acos(cos_in);
-            const float alpha = max(theta_r, theta_i);
-            const float beta = min(theta_r, theta_i);
+            const float theta_r = std::min(std::acos(cos_on), HalfPi<float>());
+            const float theta_i = std::acos(cos_in);
+            const float alpha = std::max(theta_r, theta_i);
+            const float beta = std::min(theta_r, theta_i);
 
             // Project outgoing and incoming vectors onto the tangent plane
             // and compute the cosine of the angle between them.
@@ -269,8 +268,8 @@ namespace
                   0.45f
                 * sigma2_009
                 * (delta_cos_phi >= 0.0f
-                      ? sin(alpha)
-                      : sin(alpha) - pow_int<3>(2.0f * beta * RcpPi<float>()));
+                      ? std::sin(alpha)
+                      : std::sin(alpha) - pow_int<3>(2.0f * beta * RcpPi<float>()));
             assert(C2 >= 0.0f);
 
             // Compute C3 coefficient.
@@ -286,18 +285,20 @@ namespace
                 reflectance_multiplier *
                 RcpPi<float>() * (
                       C1
-                    + delta_cos_phi * C2 * tan(beta)
-                    + (1.0f - abs(delta_cos_phi)) * C3 * tan(0.5f * (alpha + beta)));
+                    + delta_cos_phi * C2 * std::tan(beta)
+                    + (1.0f - std::abs(delta_cos_phi)) * C3 * std::tan(0.5f * (alpha + beta)));
 
             // Add interreflection component.
-            Spectrum r2 = reflectance;
-            r2 *= r2;
-            r2 *=
+            Spectrum ir = reflectance;
+            ir *= ir;
+            ir *=
                   0.17f
-                * square(reflectance_multiplier) * RcpPi<float>()
+                * square(reflectance_multiplier)
+                * RcpPi<float>()
                 * sigma2 / (sigma2 + 0.13f)
                 * (1.0f - delta_cos_phi * square(2.0f * beta * RcpPi<float>()));
-            value += r2;
+            value += ir;
+
             clamp_low_in_place(value, 0.0f);
         }
     };

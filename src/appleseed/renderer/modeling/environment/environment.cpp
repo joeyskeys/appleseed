@@ -36,11 +36,10 @@
 #include "renderer/modeling/input/inputarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {

@@ -29,16 +29,15 @@
 
 // appleseed.foundation headers.
 #include "foundation/math/population.h"
-#include "foundation/platform/types.h"
 #include "foundation/utility/statistics.h"
 #include "foundation/utility/test.h"
 
 // Standard headers.
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 TEST_SUITE(Foundation_Utility_Statistics)
 {
@@ -53,7 +52,7 @@ TEST_SUITE(Foundation_Utility_Statistics)
     {
         Statistics stats;
 
-        stats.insert<uint64>("some value", 17000);
+        stats.insert<std::uint64_t>("some value", 17000);
 
         EXPECT_EQ("  some value                    17,000", stats.to_string());
     }
@@ -71,7 +70,7 @@ TEST_SUITE(Foundation_Utility_Statistics)
     {
         Statistics stats;
 
-        stats.insert<string>("some value", "bunny");
+        stats.insert<std::string>("some value", "bunny");
 
         EXPECT_EQ("  some value                    bunny", stats.to_string());
     }
@@ -145,7 +144,7 @@ TEST_SUITE(Foundation_Utility_Statistics)
     {
         Statistics stats;
 
-        stats.insert<uint64>("the name of this value is too long to fit", 17);
+        stats.insert<std::uint64_t>("the name of this value is too long to fit", 17);
 
         EXPECT_EQ("  the name of this value is too 17", stats.to_string());
     }
@@ -154,7 +153,7 @@ TEST_SUITE(Foundation_Utility_Statistics)
     {
         Statistics stats;
 
-        stats.insert<uint64>("first value", 17);
+        stats.insert<std::uint64_t>("first value", 17);
         stats.insert("second value", 42.6);
 
         EXPECT_EQ("  first value                   17\n  second value                  42.6", stats.to_string());
@@ -163,10 +162,10 @@ TEST_SUITE(Foundation_Utility_Statistics)
     TEST_CASE(Merge_GivenNewStatistic_InsertsIt)
     {
         Statistics stats;
-        stats.insert<uint64>("existing value", 17);
+        stats.insert<std::uint64_t>("existing value", 17);
 
         Statistics other_stats;
-        other_stats.insert<uint64>("new value", 42);
+        other_stats.insert<std::uint64_t>("new value", 42);
 
         stats.merge(other_stats);
 
@@ -176,10 +175,10 @@ TEST_SUITE(Foundation_Utility_Statistics)
     TEST_CASE(Merge_GivenExistingStatisticOfSameType_MergesIt)
     {
         Statistics stats;
-        stats.insert<uint64>("existing value", 17000);
+        stats.insert<std::uint64_t>("existing value", 17000);
 
         Statistics other_stats;
-        other_stats.insert<uint64>("existing value", 42);
+        other_stats.insert<std::uint64_t>("existing value", 42);
 
         stats.merge(other_stats);
 
@@ -218,10 +217,10 @@ TEST_SUITE(Foundation_Utility_StatisticsVector)
     TEST_CASE(ToString_GivenTwoitems)
     {
         Statistics stats1;
-        stats1.insert<uint64>("counter 1", 17);
+        stats1.insert<std::uint64_t>("counter 1", 17);
 
         Statistics stats2;
-        stats2.insert<uint64>("counter 2", 42);
+        stats2.insert<std::uint64_t>("counter 2", 42);
 
         StatisticsVector vec;
         vec.insert("stats 1", stats1);

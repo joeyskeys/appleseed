@@ -50,18 +50,20 @@ set (preprocessor_definitions_common
     BOOST_CONFIG_SUPPRESS_OUTDATED_MESSAGE  # turn off "Boost.Config is older than your compiler version" warnings
 )
 if (USE_STATIC_BOOST)
-    set (preprocessor_definitions_common ${preprocessor_definitions_common}
+    set (preprocessor_definitions_common
+        ${preprocessor_definitions_common}
         BOOST_PYTHON_STATIC_LIB             # link statically against Boost.Python
     )
 else ()
-    set (preprocessor_definitions_common ${preprocessor_definitions_common}
+    set (preprocessor_definitions_common
+        ${preprocessor_definitions_common}
         BOOST_ALL_DYN_LINK                  # link dynamically
     )
 endif ()
 if (NOT USE_STATIC_EXR)
     set (preprocessor_definitions_common
         ${preprocessor_definitions_common}
-        OPENEXR_DLL                         # We need to set this pre-processor for OpenEXR to link correctly when the lib is dynamic
+        OPENEXR_DLL                         # we need to set this pre-processor for OpenEXR to link correctly when the lib is dynamic
     )
 endif ()
 
@@ -94,8 +96,6 @@ if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         /bigobj                             # Increase Number of Sections in .Obj file
     )
 endif ()
-set (exe_linker_flags_common
-)
 set (shared_lib_linker_flags_common
     ${exe_linker_flags_common}
 )
@@ -108,10 +108,12 @@ set (c_compiler_flags_debug
 )
 if (CMAKE_SIZEOF_VOID_P EQUAL 8)
     set (c_compiler_flags_debug
+        ${c_compiler_flags_debug}
         /Zi                                 # set Debug Information Format to Program Database
     )
 else ()
     set (c_compiler_flags_debug
+        ${c_compiler_flags_debug}
         /ZI                                 # set Debug Information Format to Program Database for Edit & Continue
     )
 endif ()
@@ -167,6 +169,7 @@ set (c_compiler_flags_ship
     /GL                                     # Enable link-time code generation
 )
 set (exe_linker_flags_ship
+    /DEBUG:NONE                             # Undo 'Generate Debug Info' set in Release configuration
     /LTCG                                   # Use Link Time Code Generation
     /INCREMENTAL:NO                         # Disable Incremental Linking
 )
@@ -183,9 +186,9 @@ set (c_compiler_flags_profile
     /GL                                     # Enable link-time code generation
 )
 set (exe_linker_flags_profile
+    /DEBUG                                  # Generate Debug Info
     /LTCG                                   # Use Link Time Code Generation
     /INCREMENTAL:NO                         # Disable Incremental Linking
-    /DEBUG                                  # Generate Debug Info
 )
 set (shared_lib_linker_flags_profile
     ${exe_linker_flags_profile}
@@ -231,17 +234,6 @@ macro (link_against_embree target)
     endif ()
 endmacro ()
 
-macro (link_against_libpng target)
-    if (USE_FIND_PACKAGE_FOR_PNG)
-        target_link_libraries (${target} ${PNG_LIBRARIES})
-    else ()
-        target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/libpng-debug/lib/libpng16_staticd.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/libpng-release/lib/libpng16_static.lib
-        )
-    endif ()
-endmacro ()
-
 macro (link_against_lz4 target)
     if (USE_FIND_PACKAGE_FOR_LZ4)
         target_link_libraries (${target} ${LZ4_LIBRARY})
@@ -260,11 +252,11 @@ macro (link_against_ocio target)
         )
     else ()
         target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/ocio-debug/lib/libyaml-cppmdd.lib
             debug       ${APPLESEED_DEPS_STAGE_DIR}/ocio-debug/lib/OpenColorIO.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/ocio-debug/lib/libyaml-cppmdd.lib
             debug       ${APPLESEED_DEPS_STAGE_DIR}/ocio-debug/lib/tinyxml.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/ocio-release/lib/libyaml-cppmd.lib
             optimized   ${APPLESEED_DEPS_STAGE_DIR}/ocio-release/lib/OpenColorIO.lib
+            optimized   ${APPLESEED_DEPS_STAGE_DIR}/ocio-release/lib/libyaml-cppmd.lib
             optimized   ${APPLESEED_DEPS_STAGE_DIR}/ocio-release/lib/tinyxml.lib
         )
     endif ()
@@ -273,18 +265,23 @@ endmacro ()
 macro (link_against_oiio target)
     if (USE_FIND_PACKAGE_FOR_OIIO)
         target_link_libraries (${target}
-            ${OPENIMAGEIO_LIBRARIES}
             ${LIBJPEG_LIBRARY}
             ${LIBTIFF_LIBRARY}
+            ${OPENIMAGEIO_LIBRARIES}
+            ${PNG_LIBRARIES}
         )
     else ()
         target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/oiio-debug/lib/OpenImageIO.lib
             debug       ${APPLESEED_DEPS_STAGE_DIR}/libjpeg-turbo-debug/lib/jpeg-static.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/libpng-debug/lib/libpng16_staticd.lib
             debug       ${APPLESEED_DEPS_STAGE_DIR}/libtiff-debug/lib/libtiff.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/oiio-release/lib/OpenImageIO.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/oiio-debug/lib/OpenImageIO.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/oiio-debug/lib/OpenImageIO_Util.lib
             optimized   ${APPLESEED_DEPS_STAGE_DIR}/libjpeg-turbo-release/lib/jpeg-static.lib
+            optimized   ${APPLESEED_DEPS_STAGE_DIR}/libpng-release/lib/libpng16_static.lib
             optimized   ${APPLESEED_DEPS_STAGE_DIR}/libtiff-release/lib/libtiff.lib
+            optimized   $<IF:$<OR:$<CONFIG:Profile>,$<CONFIG:Ship>>,${APPLESEED_DEPS_STAGE_DIR}/oiio-ship/lib/OpenImageIO.lib,${APPLESEED_DEPS_STAGE_DIR}/oiio-release/lib/OpenImageIO.lib>
+            optimized   $<IF:$<OR:$<CONFIG:Profile>,$<CONFIG:Ship>>,${APPLESEED_DEPS_STAGE_DIR}/oiio-ship/lib/OpenImageIO_Util.lib,${APPLESEED_DEPS_STAGE_DIR}/oiio-release/lib/OpenImageIO_Util.lib>
         )
     endif ()
 endmacro ()
@@ -313,30 +310,37 @@ endmacro ()
 
 macro (link_against_osl target)
     set (LLVM_LIBS
-        LLVMLTO LLVMLinker LLVMipo LLVMVectorize LLVMBitWriter LLVMTableGen LLVMDebugInfo LLVMOption LLVMX86Disassembler LLVMX86AsmParser
-        LLVMX86CodeGen LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info LLVMX86AsmPrinter LLVMX86Utils LLVMIRReader LLVMBitReader
-        LLVMAsmParser LLVMMCDisassembler LLVMMCParser LLVMInstrumentation LLVMInterpreter LLVMMCJIT LLVMJIT LLVMCodeGen LLVMObjCARCOpts
-        LLVMScalarOpts LLVMInstCombine LLVMTransformUtils LLVMipa LLVMAnalysis LLVMRuntimeDyld LLVMExecutionEngine LLVMTarget LLVMMC
-        LLVMObject LLVMCore LLVMSupport
+        LLVMAggressiveInstCombine LLVMAnalysis LLVMAsmParser LLVMAsmPrinter LLVMBinaryFormat LLVMBitReader
+        LLVMBitWriter LLVMCodeGen LLVMCore LLVMCoroutines LLVMCoverage LLVMDebugInfoCodeView LLVMDebugInfoDWARF
+        LLVMDebugInfoMSF LLVMDebugInfoPDB LLVMDemangle LLVMDlltoolDriver LLVMExecutionEngine LLVMFuzzMutate
+        LLVMGlobalISel LLVMInstCombine LLVMInstrumentation LLVMInterpreter LLVMipo LLVMIRReader LLVMLibDriver
+        LLVMLineEditor LLVMLinker LLVMLTO LLVMMC LLVMMCA LLVMMCDisassembler LLVMMCJIT LLVMMCParser LLVMMIRParser
+        LLVMObjCARCOpts LLVMObject LLVMObjectYAML LLVMOption LLVMOptRemarks LLVMOrcJIT LLVMPasses LLVMProfileData
+        LLVMRuntimeDyld LLVMScalarOpts LLVMSelectionDAG LLVMSupport LLVMSymbolize LLVMTableGen LLVMTarget
+        LLVMTextAPI LLVMTransformUtils LLVMVectorize LLVMWindowsManifest LLVMX86AsmParser LLVMX86AsmPrinter
+        LLVMX86CodeGen LLVMX86Desc LLVMX86Disassembler LLVMX86Info LLVMX86Utils LLVMXRay
     )
 
     if (USE_FIND_PACKAGE_FOR_OSL)
         target_link_libraries (${target}
-            ${OSL_EXEC_LIBRARY}
-            ${OSL_QUERY_LIBRARY}
             ${OSL_COMP_LIBRARY}
+            ${OSL_EXEC_LIBRARY}
+            ${OSL_NOISE_LIBRARY}
+            ${OSL_QUERY_LIBRARY}
         )
         foreach (lib ${LLVM_LIBS})
             target_link_libraries (${target} "${LLVM_LIBS_DIR}/${lib}.lib")
         endforeach ()
     else ()
         target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslexec.lib
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslquery.lib
             debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslcomp.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslexec.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslquery.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslexec.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslnoise.lib
+            debug       ${APPLESEED_DEPS_STAGE_DIR}/osl-debug/lib/oslquery.lib
             optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslcomp.lib
+            optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslexec.lib
+            optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslnoise.lib
+            optimized   ${APPLESEED_DEPS_STAGE_DIR}/osl-release/lib/oslquery.lib
         )
         foreach (lib ${LLVM_LIBS})
             target_link_libraries (${target}
@@ -344,28 +348,6 @@ macro (link_against_osl target)
                 optimized   ${APPLESEED_DEPS_STAGE_DIR}/llvm-release/lib/${lib}.lib
             )
         endforeach ()
-    endif ()
-endmacro ()
-
-macro (link_against_seexpr target)
-    if (USE_FIND_PACKAGE_FOR_SEEXPR)
-        target_link_libraries (${target} ${SEEXPR_LIBRARIES})
-    else ()
-        target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/seexpr-debug/lib/SeExpr.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/seexpr-release/lib/SeExpr.lib
-        )
-    endif ()
-endmacro ()
-
-macro (link_against_seexpreditor target)
-    if (USE_FIND_PACKAGE_FOR_SEEXPR)
-        target_link_libraries (${target} ${SEEXPREDITOR_LIBRARIES})
-    else ()
-        target_link_libraries (${target}
-            debug       ${APPLESEED_DEPS_STAGE_DIR}/seexpr-debug/lib/SeExprEditor.lib
-            optimized   ${APPLESEED_DEPS_STAGE_DIR}/seexpr-release/lib/SeExprEditor.lib
-        )
     endif ()
 endmacro ()
 

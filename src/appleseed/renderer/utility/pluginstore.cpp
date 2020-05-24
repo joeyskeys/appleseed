@@ -40,6 +40,7 @@
 
 // Boost headers.
 #include "boost/filesystem.hpp"
+#include "boost/range/iterator_range.hpp"
 #include "boost/thread/locks.hpp"
 #include "boost/thread/mutex.hpp"
 
@@ -51,7 +52,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace bf = boost::filesystem;
 
@@ -61,13 +61,13 @@ namespace renderer
 struct PluginStore::Impl
 {
     typedef PluginStore::PluginHandlerType PluginHandlerType;
-    typedef map<string, PluginHandlerType> PluginHandlerMap;
+    typedef std::map<std::string, PluginHandlerType> PluginHandlerMap;
 
     struct PluginDeleter;
-    typedef unique_ptr<Plugin, PluginDeleter> PluginUniquePtr;
+    typedef std::unique_ptr<Plugin, PluginDeleter> PluginUniquePtr;
 
-    typedef map<string, PluginUniquePtr> PluginMap;
-    typedef map<Plugin*, PluginMap::const_iterator> PluginInverseMap;
+    typedef std::map<std::string, PluginUniquePtr> PluginMap;
+    typedef std::map<Plugin*, PluginMap::const_iterator> PluginInverseMap;
 
     struct PluginDeleter
     {
@@ -135,14 +135,37 @@ struct PluginStore::Impl
         return plugin_map_it->second.get();
     }
 
+    Plugin* load_plugin_and_invoke_handlers_no_lock(const char* filepath)
+    {
+        // Load the plugin.
+        Plugin* plugin = load_plugin_no_lock(filepath);
+
+        if (plugin != nullptr)
+        {
+            // Invoke plugin handlers.
+            for (const auto& plugin_handler_item : m_plugin_handlers)
+            {
+                const std::string& entry_point_name = plugin_handler_item.first;
+                const PluginHandlerType& plugin_handler = plugin_handler_item.second;
+
+                // If the plugin exposes the expected entry point then pass it to the plugin handler.
+                void* plugin_entry_point = plugin->get_symbol(entry_point_name.c_str());
+                if (plugin_entry_point != nullptr)
+                    plugin_handler(plugin, plugin_entry_point);
+            }
+        }
+
+        return plugin;
+    }
+
     void load_all_plugins_from_path_no_lock(bf::path path)
     {
-        path = safe_canonical(path);
+        path = safe_weakly_canonical(path);
 
         // Only consider directories.
         if (!bf::exists(path) || !bf::is_directory(path))
         {
-            RENDERER_LOG_WARNING("not scanning %s for plugins since it doesn't exist or it isn't a directory.",
+            RENDERER_LOG_DEBUG("not scanning %s for plugins since it doesn't exist or it isn't a directory.",
                 path.string().c_str());
             return;
         }
@@ -150,59 +173,18 @@ struct PluginStore::Impl
         RENDERER_LOG_INFO("scanning %s for plugins...", path.string().c_str());
 
         // Iterate over all files in this directory.
-        for (bf::directory_iterator i(path), e; i != e; ++i)
+        for (const bf::path& entry_path : boost::make_iterator_range(bf::directory_iterator(path)))
         {
-            const bf::path& filepath = i->path();
-
             // Only consider files.
-            if (!bf::is_regular_file(filepath))
+            if (!bf::is_regular_file(entry_path))
                 continue;
 
             // Only consider shared libraries.
-            if (lower_case(filepath.extension().string()) != SharedLibrary::get_default_file_extension())
+            if (lower_case(entry_path.extension().string()) != SharedLibrary::get_default_file_extension())
                 continue;
 
-            vector<PluginHandlerMap::value_type> relevant_plugin_handlers;
-
-            try
-            {
-                // Open the shared library.
-                SharedLibrary library(filepath.string().c_str());
-
-                // Collect known entry points defined by the shared library.
-                for (const auto& plugin_handler_item : m_plugin_handlers)
-                {
-                    const string& entry_point_name = plugin_handler_item.first;
-
-                    // If the plugin defines the expected entry point then keep this plugin handler to invoke it later.
-                    if (library.get_symbol(entry_point_name.c_str()) != nullptr)
-                        relevant_plugin_handlers.push_back(plugin_handler_item);
-                }
-            }
-            catch (const ExceptionCannotLoadSharedLib& e)
-            {
-                RENDERER_LOG_DEBUG("could not open shared library %s: %s.", filepath.string().c_str(), e.what());
-                continue;
-            }
-
-            if (!relevant_plugin_handlers.empty())
-            {
-                // Load the plugin.
-                Plugin* plugin = load_plugin_no_lock(filepath.string().c_str());
-
-                // Invoke plugin handlers.
-                for (const auto& plugin_handler_item : relevant_plugin_handlers)
-                {
-                    const string& entry_point_name = plugin_handler_item.first;
-                    const PluginHandlerType& plugin_handler = plugin_handler_item.second;
-
-                    // Retrieve again the plugin's entry point corresponding to this plugin handler.
-                    void* plugin_entry_point = plugin->get_symbol(entry_point_name.c_str());
-
-                    // Invoke the plugin handler.
-                    plugin_handler(plugin, plugin_entry_point);
-                }
-            }
+            // Load the plugin and invoke plugin handlers.
+            load_plugin_and_invoke_handlers_no_lock(entry_path.string().c_str());
         }
     }
 };
@@ -240,7 +222,7 @@ void PluginStore::unload_all_plugins()
 Plugin* PluginStore::load_plugin(const char* filepath)
 {
     boost::lock_guard<boost::mutex> lock(impl->m_store_mutex);
-    return impl->load_plugin_no_lock(filepath);
+    return impl->load_plugin_and_invoke_handlers_no_lock(filepath);
 }
 
 void PluginStore::unload_plugin(Plugin* plugin)

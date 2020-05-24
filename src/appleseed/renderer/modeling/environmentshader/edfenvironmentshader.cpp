@@ -41,10 +41,10 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/image/color.h"
 #include "foundation/math/vector.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <string>
@@ -56,7 +56,6 @@ namespace renderer      { class PixelContext; }
 namespace renderer      { class Project; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -113,7 +112,7 @@ namespace
                 RENDERER_LOG_ERROR(
                     "%scannot find environment edf \"%s\".",
                     context.get(),
-                    m_params.get_required<string>("environment_edf", "").c_str());
+                    m_params.get_required<std::string>("environment_edf", "").c_str());
                 return false;
             }
 

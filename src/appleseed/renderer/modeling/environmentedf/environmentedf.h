@@ -80,12 +80,18 @@ class APPLESEED_DLLSYMBOL EnvironmentEDF
     // Return a string identifying the model of this entity.
     virtual const char* get_model() const = 0;
 
+    enum Flags
+    {
+        CastShadows = 1UL << 0      // does this environment cast shadows?
+    };
+
+    // Retrieve the flags.
+    int get_flags() const;
+
     // Access the transform sequence of the environment EDF.
     TransformSequence& transform_sequence();
     const TransformSequence& transform_sequence() const;
 
-    // This method is called once before rendering each frame.
-    // Returns true on success, false otherwise.
     bool on_frame_begin(
         const Project&              project,
         const BaseGroup*            parent,
@@ -117,13 +123,19 @@ class APPLESEED_DLLSYMBOL EnvironmentEDF
         const foundation::Vector3f& outgoing) const = 0;        // world space emission direction, unit-length
 
   protected:
-    TransformSequence m_transform_sequence;
+    int                 m_flags;
+    TransformSequence   m_transform_sequence;
 };
 
 
 //
 // EnvironmentEDF class implementation.
 //
+
+inline int EnvironmentEDF::get_flags() const
+{
+    return m_flags;
+}
 
 inline TransformSequence& EnvironmentEDF::transform_sequence()
 {

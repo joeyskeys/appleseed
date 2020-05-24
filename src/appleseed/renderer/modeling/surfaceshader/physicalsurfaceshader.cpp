@@ -45,8 +45,8 @@
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 
 // Standard headers.
 #include <cstddef>
@@ -57,7 +57,6 @@ namespace renderer  { class PixelContext; }
 namespace renderer  { class Project; }
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -112,6 +111,8 @@ namespace
             ShadingComponents&          shading_components,
             AOVComponents&              aov_components) const override
         {
+            assert(shading_context.get_lighting_engine() != nullptr);
+
             // OSL shaders can modify the shading basis in the shading point when using bump,
             // normal maps or anisotropy. When using more than 1 lighting sample, we need to
             // save and restore the basis for each sample.

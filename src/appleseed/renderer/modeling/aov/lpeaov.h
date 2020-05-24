@@ -35,9 +35,6 @@
 #include "renderer/modeling/aov/aov.h"
 #include "renderer/modeling/aov/iaovfactory.h"
 
-// appleseed.foundation headers.
-#include "foundation/utility/autoreleaseptr.h"
-
 // OSL headers.
 #include "OSL/accum.h"
 

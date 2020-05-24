@@ -31,7 +31,7 @@
 #include "commandlinehandler.h"
 #include "stdouttilecallback.h"
 
-// appleseed.shared headers.
+// appleseed.common headers.
 #include "application/application.h"
 #include "application/progresstilecallback.h"
 #include "application/superlogger.h"
@@ -41,21 +41,22 @@
 #include "renderer/api/lighting.h"
 #include "renderer/api/log.h"
 #include "renderer/api/object.h"
+#include "renderer/api/postprocessing.h"
 #include "renderer/api/project.h"
 #include "renderer/api/rendering.h"
 #include "renderer/api/scene.h"
 #include "renderer/api/utility.h"
 
 // appleseed.foundation headers.
+#include "foundation/log/log.h"
+#include "foundation/memory/autoreleaseptr.h"
 #include "foundation/platform/console.h"
 #include "foundation/platform/debugger.h"
 #include "foundation/platform/thread.h"
-#include "foundation/utility/autoreleaseptr.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/benchmark.h"
 #include "foundation/utility/filter.h"
-#include "foundation/utility/log.h"
 #include "foundation/utility/searchpaths.h"
-#include "foundation/utility/string.h"
 #include "foundation/utility/test.h"
 
 // appleseed.main headers.
@@ -66,16 +67,17 @@
 #include "boost/filesystem/path.hpp"
 
 // Standard headers.
+#include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <string>
 
 using namespace appleseed::cli;
-using namespace appleseed::shared;
+using namespace appleseed::common;
 using namespace foundation;
 using namespace renderer;
-using namespace std;
 namespace bf = boost::filesystem;
 
 namespace
@@ -130,7 +132,7 @@ namespace
     {
         // Configure the renderer's logger: mute all log messages except warnings and errors.
         SaveLogFormatterConfig save_global_logger_config(global_logger());
-        global_logger().set_all_formats(string());
+        global_logger().set_all_formats(std::string());
         global_logger().reset_format(LogMessage::Warning);
         global_logger().reset_format(LogMessage::Error);
         global_logger().reset_format(LogMessage::Fatal);
@@ -141,10 +143,21 @@ namespace
                 g_logger,
                 g_cl.m_verbose_unit_tests.is_set()));
 
-        TestResult result;
-
+        // Change current directory to the tests' root directory.
         const bf::path old_current_path =
             Application::change_current_directory_to_tests_root_path();
+
+        // Create unit tests output directories.
+        if (!Application::create_unit_tests_output_directories())
+        {
+            LOG_ERROR(
+                g_logger,
+                "failed to create unit tests output directories %s, aborting test execution.",
+                Application::get_unit_tests_output_path());
+            return false;
+        }
+
+        TestResult result;
 
         // Run test suites.
         if (g_cl.m_run_unit_tests.values().empty())
@@ -166,10 +179,10 @@ namespace
             }
         }
 
+        print_unit_test_result(result);
+
         // Restore the current directory.
         bf::current_path(old_current_path);
-
-        print_unit_test_result(result);
 
         return result.get_assertion_failure_count() == 0;
     }
@@ -178,7 +191,7 @@ namespace
     {
         // Configure the renderer's logger: mute all log messages except warnings and errors.
         SaveLogFormatterConfig save_global_logger_config(global_logger());
-        global_logger().set_all_formats(string());
+        global_logger().set_all_formats(std::string());
         global_logger().reset_format(LogMessage::Warning);
         global_logger().reset_format(LogMessage::Error);
         global_logger().reset_format(LogMessage::Fatal);
@@ -193,7 +206,7 @@ namespace
         // Try to add a benchmark listener that outputs to a XML file.
         auto_release_ptr<XMLFileBenchmarkListener> xmlfile_listener(
             create_xmlfile_benchmark_listener());
-        const string xmlfile_name = "benchmark." + get_time_stamp_string() + ".xml";
+        const std::string xmlfile_name = "benchmark." + get_time_stamp_string() + ".xml";
         const bf::path xmlfile_path =
               bf::path(Application::get_tests_root_path())
             / "unit benchmarks" / "results" / xmlfile_name;
@@ -253,7 +266,7 @@ namespace
         {
             params.insert_path(
                 "uniform_pixel_renderer.samples",
-                g_cl.m_samples.values()[1]);
+                g_cl.m_samples.value());
         }
 
         if (g_cl.m_passes.is_set())
@@ -276,15 +289,15 @@ namespace
         for (size_t i = 0; i < g_cl.m_params.values().size(); ++i)
         {
             // Retrieve the assignment string (of the form name=value).
-            const string& s = g_cl.m_params.values()[i];
+            const std::string& s = g_cl.m_params.values()[i];
 
             // Retrieve the name and the value of the parameter.
-            const string::size_type equal_pos = s.find_first_of('=');
-            const string path = s.substr(0, equal_pos);
-            const string value = s.substr(equal_pos + 1);
+            const std::string::size_type equal_pos = s.find_first_of('=');
+            const std::string path = s.substr(0, equal_pos);
+            const std::string value = s.substr(equal_pos + 1);
 
             // Insert the parameter.
-            params.insert_path(path, value);
+            params.insert_path(path.c_str(), value);
         }
     }
 
@@ -293,41 +306,42 @@ namespace
         const Frame* frame = project.get_frame();
         assert(frame != nullptr);
 
-        ParamArray params = frame->get_parameters();
+        const ParamArray initial_params = frame->get_parameters();
+        ParamArray new_params = initial_params;
 
         if (g_cl.m_resolution.is_set())
         {
-            const string resolution =
+            const std::string resolution =
                   foundation::to_string(g_cl.m_resolution.values()[0]) + ' ' +
                   foundation::to_string(g_cl.m_resolution.values()[1]);
-            params.insert("resolution", resolution);
+            new_params.insert("resolution", resolution);
         }
 
         if (g_cl.m_window.is_set())
         {
-            const string crop_window =
+            const std::string crop_window =
                   foundation::to_string(g_cl.m_window.values()[0]) + ' ' +
                   foundation::to_string(g_cl.m_window.values()[1]) + ' ' +
                   foundation::to_string(g_cl.m_window.values()[2]) + ' ' +
                   foundation::to_string(g_cl.m_window.values()[3]);
-            params.insert("crop_window", crop_window);
+            new_params.insert("crop_window", crop_window);
         }
 
         if (g_cl.m_noise_seed.is_set())
         {
-            const uint32 noise_seed = static_cast<uint32>(g_cl.m_noise_seed.value());
-            params.insert("noise_seed", noise_seed);
+            const std::uint32_t noise_seed = static_cast<std::uint32_t>(g_cl.m_noise_seed.value());
+            new_params.insert("noise_seed", noise_seed);
         }
 
         if (g_cl.m_output.is_set())
         {
             const char* file_path = g_cl.m_output.value().c_str();
-            params.insert("output_path", file_path);
+            new_params.insert("output_path", file_path);
         }
 
         if (g_cl.m_checkpoint_create.is_set())
         {
-            params.insert("checkpoint_create", true);
+            new_params.insert("checkpoint_create", true);
 
             if (g_cl.m_checkpoint_create.values().empty() && !g_cl.m_output.is_set())
             {
@@ -338,7 +352,7 @@ namespace
                 return false;
             }
 
-            params.insert(
+            new_params.insert(
                 "checkpoint_create_path",
                 !g_cl.m_checkpoint_create.values().empty()
                     ? g_cl.m_checkpoint_create.value()
@@ -347,7 +361,7 @@ namespace
 
         if (g_cl.m_checkpoint_resume.is_set())
         {
-            params.insert("checkpoint_resume", true);
+            new_params.insert("checkpoint_resume", true);
 
             if (g_cl.m_checkpoint_resume.values().empty() && !g_cl.m_output.is_set())
             {
@@ -358,7 +372,7 @@ namespace
                 return false;
             }
 
-            params.insert(
+            new_params.insert(
                 "checkpoint_resume_path",
                 !g_cl.m_checkpoint_resume.values().empty()
                     ? g_cl.m_checkpoint_resume.value()
@@ -366,16 +380,34 @@ namespace
         }
 
         if (g_cl.m_passes.is_set())
-            params.insert_path("passes", g_cl.m_passes.values()[0]);
+            new_params.insert_path("passes", g_cl.m_passes.values()[0]);
 
-        auto_release_ptr<Frame> new_frame(
-            FrameFactory::create(
-                frame->get_name(),
-                params,
-                frame->aovs(),
-                frame->lpe_aovs()));
+        if (new_params != initial_params)
+        {
+            LOG_DEBUG(
+                g_logger,
+                "command line parameters require frame \"%s\" to be recreated.",
+                frame->get_name());
 
-        project.set_frame(new_frame);
+            auto_release_ptr<Frame> new_frame =
+                FrameFactory::create(
+                    frame->get_name(),
+                    new_params,
+                    frame->aovs(),
+                    frame->lpe_aovs());
+
+            // Recreate post-processing stages.
+            for (PostProcessingStage& stage : frame->post_processing_stages())
+            {
+                const IPostProcessingStageFactory* stage_factory =
+                    project.get_factory_registrar<PostProcessingStage>().lookup(stage.get_model());
+                assert(stage_factory);
+                new_frame->post_processing_stages().insert(
+                    stage_factory->create(stage.get_name(), stage.get_parameters()));
+            }
+
+            project.set_frame(new_frame);
+        }
 
         return true;
     }
@@ -400,12 +432,12 @@ namespace
     {
         if (g_cl.m_show_object_instances.is_set() || g_cl.m_hide_object_instances.is_set())
         {
-            const string show_regex =
+            const std::string show_regex =
                 g_cl.m_show_object_instances.is_set()
                     ? g_cl.m_show_object_instances.value()
                     : ".*";     // match everything
 
-            const string hide_regex =
+            const std::string hide_regex =
                 g_cl.m_hide_object_instances.is_set()
                     ? g_cl.m_hide_object_instances.value()
                     : "(?!)";   // match nothing
@@ -435,23 +467,23 @@ namespace
 #if defined __APPLE__ || defined _WIN32
 
     // Invoke a system command to open an image file.
-    void display_frame(const string& path)
+    void display_frame(const std::string& path)
     {
-        const string quoted_path = "\"" + path + "\"";
+        const std::string quoted_path = "\"" + path + "\"";
 
 #if defined __APPLE__
-        const string command = "open " + quoted_path;
+        const std::string command = "open " + quoted_path;
 #elif defined _WIN32
-        const string command = quoted_path;
+        const std::string command = quoted_path;
 #endif
 
         LOG_DEBUG(g_logger, "executing '%s'", command.c_str());
-        std::system(command.c_str());   // needs std:: qualifier
+        std::system(command.c_str());
     }
 
 #endif
 
-    auto_release_ptr<Project> load_project(const string& project_filepath)
+    auto_release_ptr<Project> load_project(const std::string& project_filepath)
     {
         // Construct the schema file path.
         const bf::path schema_filepath =
@@ -460,9 +492,8 @@ namespace
             / "project.xsd";
 
         // Load the project from disk.
-        ProjectFileReader reader;
         return
-            reader.read(
+            ProjectFileReader::read(
                 project_filepath.c_str(),
                 schema_filepath.string().c_str());
     }
@@ -470,7 +501,7 @@ namespace
     bool configure_project(Project& project, ParamArray& params)
     {
         // Retrieve the name of the configuration to use.
-        const string config_name = g_cl.m_configuration.is_set()
+        const std::string config_name = g_cl.m_configuration.is_set()
             ? g_cl.m_configuration.value()
             : "final";
 
@@ -502,11 +533,11 @@ namespace
 
     bool is_progressive_render(const ParamArray& params)
     {
-        const string value = params.get_required<string>("frame_renderer", "generic");
+        const std::string value = params.get_required<std::string>("frame_renderer", "generic");
         return value == "progressive";
     }
 
-    bool render(const string& project_filename)
+    bool render(const std::string& project_filename)
     {
         // Load the project.
         auto_release_ptr<Project> project = load_project(project_filename);
@@ -519,7 +550,7 @@ namespace
             return false;
 
         // Create the tile callback factory.
-        unique_ptr<ITileCallbackFactory> tile_callback_factory;
+        std::unique_ptr<ITileCallbackFactory> tile_callback_factory;
         if (g_cl.m_send_to_stdout.is_set())
         {
             tile_callback_factory.reset(
@@ -529,7 +560,7 @@ namespace
         else if (project->get_display() == nullptr)
         {
             // Create a default tile callback if needed.
-            if (params.get_optional<string>("frame_renderer", "") != "progressive")
+            if (params.get_optional<std::string>("frame_renderer", "") != "progressive")
             {
                 tile_callback_factory.reset(
                     new ProgressTileCallbackFactory(
@@ -547,7 +578,6 @@ namespace
             project.ref(),
             params,
             resource_search_paths,
-            &renderer_controller,
             tile_callback_factory.get());
 
         // Render the frame.
@@ -556,11 +586,11 @@ namespace
         if (params.get_optional<bool>("background_mode", true))
         {
             ProcessPriorityContext background_context(ProcessPriorityLow, &g_logger);
-            rendering_result = renderer.render();
+            rendering_result = renderer.render(renderer_controller);
         }
         else
         {
-            rendering_result = renderer.render();
+            rendering_result = renderer.render(renderer_controller);
         }
         if (rendering_result.m_status != MasterRenderer::RenderingResult::Succeeded)
             return false;
@@ -569,7 +599,7 @@ namespace
         LOG_INFO(
             g_logger,
             "rendering finished in %s.",
-            pretty_time(rendering_result.m_render_time, 3).c_str());
+            pretty_time(project->get_rendering_timer().get_seconds(), 3).c_str());
 
         bool success = true;
 
@@ -633,7 +663,7 @@ namespace
         return success;
     }
 
-    bool benchmark_render(const string& project_filename)
+    bool benchmark_render(const std::string& project_filename)
     {
         // Configure our logger.
         SaveLogFormatterConfig save_g_logger_config(g_logger);
@@ -642,7 +672,7 @@ namespace
 
         // Configure the renderer's logger: mute all log messages except warnings and errors.
         SaveLogFormatterConfig save_global_logger_config(global_logger());
-        global_logger().set_all_formats(string());
+        global_logger().set_all_formats(std::string());
         global_logger().reset_format(LogMessage::Warning);
         global_logger().reset_format(LogMessage::Error);
         global_logger().reset_format(LogMessage::Fatal);
@@ -665,8 +695,7 @@ namespace
         MasterRenderer renderer(
             project.ref(),
             params,
-            resource_search_paths,
-            &renderer_controller);
+            resource_search_paths);
 
         double total_time_seconds, render_time_seconds;
         {
@@ -674,16 +703,16 @@ namespace
             ProcessPriorityContext benchmark_context(ProcessPriorityHigh, &g_logger);
 
             // Render a first time.
-            auto result = renderer.render();
+            auto result = renderer.render(renderer_controller);
             if (result.m_status != MasterRenderer::RenderingResult::Succeeded)
                 return false;
-            total_time_seconds = result.m_render_time;
+            total_time_seconds = project->get_rendering_timer().get_seconds();
 
             // Render a second time.
-            result = renderer.render();
+            result = renderer.render(renderer_controller);
             if (result.m_status != MasterRenderer::RenderingResult::Succeeded)
                 return false;
-            render_time_seconds = result.m_render_time;
+            render_time_seconds = project->get_rendering_timer().get_seconds();
         }
 
         // Write the frame to disk.
@@ -749,15 +778,18 @@ int main(int argc, char* argv[])
     // Render the specified project.
     if (!g_cl.m_filename.values().empty())
     {
-        const string project_filename = g_cl.m_filename.value();
+        const std::string project_filename = g_cl.m_filename.value();
 
         if (g_cl.m_benchmark_mode.is_set())
             success = success && benchmark_render(project_filename);
         else success = success && render(project_filename);
     }
 
+    const int return_code = success ? 0 : 1;
+    LOG_DEBUG(g_logger, "returning code %d.", return_code);
+
     if (is_debugger_attached())
         Console::pause();
 
-    return success ? 0 : 1;
+    return return_code;
 }

@@ -33,12 +33,12 @@
 #include "foundation/core/exceptions/stringexception.h"
 #include "foundation/math/population.h"
 #include "foundation/platform/compiler.h"
-#include "foundation/platform/types.h"
-#include "foundation/utility/string.h"
+#include "foundation/string/string.h"
 
 // Standard headers.
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <iomanip>
 #include <ios>
 #include <map>
@@ -93,12 +93,12 @@ class Statistics
     struct IntegerEntry
       : public Entry
     {
-        int64 m_value;
+        std::int64_t m_value;
 
         IntegerEntry(
             const std::string&          name,
             const std::string&          unit,
-            const int64                 value);
+            const std::int64_t          value);
 
         std::unique_ptr<Entry> clone() const override;
         void merge(const Entry* other) override;
@@ -108,12 +108,12 @@ class Statistics
     struct UnsignedIntegerEntry
       : public Entry
     {
-        uint64 m_value;
+        std::uint64_t m_value;
 
         UnsignedIntegerEntry(
             const std::string&          name,
             const std::string&          unit,
-            const uint64                value);
+            const std::uint64_t         value);
 
         std::unique_ptr<Entry> clone() const override;
         void merge(const Entry* other) override;
@@ -225,7 +225,7 @@ class Statistics
 
     void insert_size(
         const std::string&              name,
-        const uint64                    bytes,
+        const std::uint64_t             bytes,
         const std::streamsize           precision = 1);
 
     void insert_time(
@@ -318,9 +318,9 @@ void Statistics::insert(
 }
 
 template <>
-inline void Statistics::insert<int32>(
+inline void Statistics::insert<int>(
     const std::string&                  name,
-    const int32&                        value,
+    const int&                          value,
     const std::string&                  unit)
 {
     insert(
@@ -329,9 +329,9 @@ inline void Statistics::insert<int32>(
 }
 
 template <>
-inline void Statistics::insert<uint32>(
+inline void Statistics::insert<unsigned int>(
     const std::string&                  name,
-    const uint32&                       value,
+    const unsigned int&                 value,
     const std::string&                  unit)
 {
     insert(
@@ -340,9 +340,9 @@ inline void Statistics::insert<uint32>(
 }
 
 template <>
-inline void Statistics::insert<int64>(
+inline void Statistics::insert<long>(
     const std::string&                  name,
-    const int64&                        value,
+    const long&                         value,
     const std::string&                  unit)
 {
     insert(
@@ -351,9 +351,9 @@ inline void Statistics::insert<int64>(
 }
 
 template <>
-inline void Statistics::insert<uint64>(
+inline void Statistics::insert<unsigned long>(
     const std::string&                  name,
-    const uint64&                       value,
+    const unsigned long&                value,
     const std::string&                  unit)
 {
     insert(
@@ -361,6 +361,27 @@ inline void Statistics::insert<uint64>(
             new UnsignedIntegerEntry(name, unit, value)));
 }
 
+template <>
+inline void Statistics::insert<long long>(
+    const std::string&                  name,
+    const long long&                    value,
+    const std::string&                  unit)
+{
+    insert(
+        std::unique_ptr<IntegerEntry>(
+            new IntegerEntry(name, unit, value)));
+}
+
+template <>
+inline void Statistics::insert<unsigned long long>(
+    const std::string&                  name,
+    const unsigned long long&           value,
+    const std::string&                  unit)
+{
+    insert(
+        std::unique_ptr<UnsignedIntegerEntry>(
+            new UnsignedIntegerEntry(name, unit, value)));
+}
 template <>
 inline void Statistics::insert<float>(
     const std::string&                  name,
@@ -417,7 +438,7 @@ inline void Statistics::insert(
 
 inline void Statistics::insert_size(
     const std::string&                  name,
-    const uint64                        bytes,
+    const std::uint64_t                 bytes,
     const std::streamsize               precision)
 {
     insert(name, pretty_size(bytes, precision));

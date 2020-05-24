@@ -33,10 +33,12 @@
 #include "renderer/modeling/input/source.h"
 #include "renderer/modeling/input/texturesource.h"
 #include "renderer/modeling/texture/texture.h"
+#include "renderer/modeling/texture/tileptr.h"
 #include "renderer/utility/messagecontext.h"
 #include "renderer/utility/paramarray.h"
 
 // appleseed.foundation headers.
+#include "foundation/containers/dictionary.h"
 #include "foundation/image/canvasproperties.h"
 #include "foundation/image/color.h"
 #include "foundation/image/colorspace.h"
@@ -44,7 +46,6 @@
 #include "foundation/image/tile.h"
 #include "foundation/utility/api/apistring.h"
 #include "foundation/utility/api/specializedapiarrays.h"
-#include "foundation/utility/containers/dictionary.h"
 #include "foundation/utility/makevector.h"
 #include "foundation/utility/uid.h"
 
@@ -55,7 +56,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -138,22 +138,15 @@ namespace
             return new TextureSource(assembly_uid, texture_instance);
         }
 
-        Tile* load_tile(
+        TilePtr load_tile(
             const size_t            tile_x,
             const size_t            tile_y) override
         {
-            return
+            Tile* tile =
                 m_image.get()
                     ? &m_image->tile(tile_x, tile_y)
                     : &m_dummy_texture->m_tile;
-        }
-
-        void unload_tile(
-            const size_t            tile_x,
-            const size_t            tile_y,
-            const Tile*             tile) override
-        {
-            // Nothing to do, the tile is owned by `m_image`.
+            return TilePtr::make_non_owning(tile);  // the tile is owned by `m_image`
         }
 
       private:
@@ -170,17 +163,17 @@ namespace
             }
         };
 
-        unique_ptr<DummyTexture>    m_dummy_texture;
-        auto_release_ptr<Image>     m_image;
-        ColorSpace                  m_color_space;
+        std::unique_ptr<DummyTexture>    m_dummy_texture;
+        auto_release_ptr<Image>          m_image;
+        ColorSpace                       m_color_space;
 
         void extract_parameters()
         {
             const EntityDefMessageContext context("texture", this);
 
             // Retrieve the color space.
-            const string color_space =
-                m_params.get_required<string>(
+            const std::string color_space =
+                m_params.get_required<std::string>(
                     "color_space",
                     "linear_rgb",
                     make_vector("linear_rgb", "srgb", "ciexyz"),

@@ -31,33 +31,32 @@
 #include "loggerbenchmarklistener.h"
 
 // appleseed.foundation headers.
+#include "foundation/log/log.h"
 #include "foundation/platform/types.h"
+#include "foundation/string/string.h"
 #include "foundation/utility/benchmark/benchmarklistenerbase.h"
 #include "foundation/utility/benchmark/benchmarksuite.h"
 #include "foundation/utility/benchmark/ibenchmarkcase.h"
 #include "foundation/utility/benchmark/timingresult.h"
 #include "foundation/utility/foreach.h"
-#include "foundation/utility/log.h"
-#include "foundation/utility/string.h"
 #include "foundation/utility/test.h"
 
 // Standard headers.
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <ios>
 #include <string>
 #include <vector>
-
-using namespace std;
 
 namespace foundation
 {
 
 namespace
 {
-    string pretty_callrate(
-        const TimingResult& timing_result,
-        const streamsize    precision = 1)
+    std::string pretty_callrate(
+        const TimingResult&      timing_result,
+        const std::streamsize    precision = 1)
     {
         assert(timing_result.m_ticks > 0.0);
 
@@ -96,7 +95,7 @@ namespace
 
     TEST_SUITE(Foundation_Utility_Benchmark)
     {
-        string pretty_callrate_helper(const double rate)
+        std::string pretty_callrate_helper(const double rate)
         {
             TimingResult result;
             result.m_ticks = 1.0;
@@ -162,11 +161,11 @@ namespace
                 line);
 
             // Split the message into multiple components, one for each line.
-            vector<string> tokens;
+            std::vector<std::string> tokens;
             split(message, "\n", tokens);
 
             // Print the message.
-            for (const_each<vector<string>> i = tokens; i; ++i)
+            for (const_each<std::vector<std::string>> i = tokens; i; ++i)
                 LOG_ERROR(m_logger, "    %s", i->c_str());
         }
 
@@ -177,7 +176,7 @@ namespace
             const size_t            line,
             const TimingResult&     timing_result) override
         {
-            string callrate_string;
+            std::string callrate_string;
 
             if (timing_result.m_ticks > 0.0)
             {
@@ -198,7 +197,7 @@ namespace
                 "  %s: %s %s %s",
                 benchmark_case.get_name(),
                 timing_result.m_ticks >= 1000.0
-                    ? pretty_uint(static_cast<uint64>(timing_result.m_ticks)).c_str()
+                    ? pretty_uint(static_cast<std::uint64_t>(timing_result.m_ticks)).c_str()
                     : pretty_scalar(timing_result.m_ticks).c_str(),
                 plural(timing_result.m_ticks, "tick").c_str(),
                 callrate_string.c_str());

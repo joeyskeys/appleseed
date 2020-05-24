@@ -44,7 +44,6 @@
 #include <string>
 
 using namespace foundation;
-using namespace std;
 
 namespace renderer
 {
@@ -71,7 +70,7 @@ ProjectPoints::ProjectPoints(
 {
     auto_release_ptr<Scene> scene = SceneFactory::create();
 
-    const string camera_name = camera->get_name();
+    const std::string camera_name = camera->get_name();
     scene->cameras().insert(camera);
 
     impl->m_project = ProjectFactory::create("project_points");
@@ -97,7 +96,7 @@ ProjectPoints::ProjectPoints(
             impl->m_frame_begin_recorder);
 
     if (impl->m_initialized)
-        impl->m_camera = impl->m_project->get_scene()->get_active_camera();
+        impl->m_camera = impl->m_project->get_scene()->get_render_data().m_active_camera;
 }
 
 ProjectPoints::~ProjectPoints()
